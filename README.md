@@ -26,7 +26,15 @@ Features:
 - Coverage checklist to track what you've addressed
 - Session review summary
 
-### Challenges included:
+### `bottleneck-spotter.html`
+Interactive architecture diagrams with stress scenarios. Apply a condition (traffic spike, DB failure, cache loss), then click the component that breaks first. Get detailed explanations of why and how failures cascade.
+
+Architectures included:
+- Standard Web Application (LB → app → DB + cache)
+- Event Processing Pipeline (producers → queue → workers → storage)
+- Microservices with API Gateway (gateway → services → DBs + external APIs)
+
+### Challenges included (whiteboard):
 - Notification System
 - URL Shortener
 - Social Feed / Timeline

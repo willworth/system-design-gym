@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bottleneck Spotter — Interview Prep</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --accent: #818cf8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --cyan: #06b6d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .top-bar h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--red);
+    white-space: nowrap;
+  }
+
+  .scenario-info {
+    flex: 1;
+    text-align: center;
+  }
+
+  .scenario-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .scenario-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .btn {
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    overflow: hidden;
+  }
+
+  /* ======== Diagram Area ======== */
+  .diagram-area {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .diagram-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Architecture nodes */
+  .arch-node {
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+
+  .arch-node:hover { filter: brightness(1.2); }
+
+  .arch-node.selected .node-border {
+    stroke: var(--amber);
+    stroke-width: 3;
+    stroke-dasharray: 6 3;
+    animation: dash 0.8s linear infinite;
+  }
+
+  .arch-node.bottleneck-correct .node-border {
+    stroke: var(--green);
+    stroke-width: 3;
+  }
+
+  .arch-node.bottleneck-wrong .node-border {
+    stroke: var(--red);
+    stroke-width: 3;
+  }
+
+  .arch-node.bottleneck-actual .node-border {
+    stroke: var(--amber);
+    stroke-width: 3;
+    stroke-dasharray: 6 3;
+  }
+
+  @keyframes dash {
+    to { stroke-dashoffset: -18; }
+  }
+
+  .node-body { fill: var(--card); }
+  .node-border { stroke: var(--border); stroke-width: 1.5; fill: none; }
+  .node-label {
+    fill: var(--text);
+    font-size: 13px;
+    font-family: -apple-system, sans-serif;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+  }
+  .node-type-label {
+    fill: var(--muted);
+    font-size: 10px;
+    font-family: -apple-system, sans-serif;
+    text-anchor: middle;
+    pointer-events: none;
+  }
+
+  .node-icon {
+    fill: var(--muted);
+    font-size: 18px;
+    font-family: -apple-system, sans-serif;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+  }
+
+  /* Connection arrows */
+  .conn-line {
+    stroke: var(--border);
+    stroke-width: 1.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+
+  .conn-label {
+    fill: var(--muted);
+    font-size: 10px;
+    font-family: -apple-system, sans-serif;
+    text-anchor: middle;
+  }
+
+  /* Stress indicators */
+  .stress-overlay {
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .stress-overlay.active { opacity: 1; }
+
+  .stress-pulse {
+    animation: stress-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes stress-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Stress condition badge */
+  .stress-badge {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--red);
+    color: #fff;
+    padding: 0.5rem 1.25rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    z-index: 10;
+    display: none;
+    text-align: center;
+    max-width: 90%;
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  }
+
+  .stress-badge.visible { display: block; }
+
+  /* ======== Right Panel ======== */
+  .panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-tab {
+    flex: 1;
+    padding: 0.6rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .panel-tab:hover { color: var(--text); }
+  .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  .panel-section { display: none; }
+  .panel-section.active { display: block; }
+
+  /* Scenario picker */
+  .scenario-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .scenario-card:hover { border-color: var(--accent); }
+  .scenario-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+  .scenario-card h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .scenario-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+
+  /* Stress conditions */
+  .stress-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .stress-card:hover { border-color: var(--red); }
+  .stress-card.active {
+    border-color: var(--red);
+    background: var(--red);
+    background: rgba(239, 68, 68, 0.12);
+  }
+
+  .stress-card h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .stress-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+
+  .stress-icon { font-size: 1rem; }
+
+  /* Answer area */
+  .answer-prompt {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border-left: 3px solid var(--amber);
+  }
+
+  .answer-prompt h3 {
+    font-size: 0.95rem;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
+  }
+
+  .answer-prompt p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text);
+  }
+
+  .answer-instruction {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .submit-area {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  /* Results */
+  .result-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border-left: 3px solid var(--border);
+  }
+
+  .result-card.correct { border-left-color: var(--green); }
+  .result-card.wrong { border-left-color: var(--red); }
+
+  .result-card h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .result-card p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .result-card .why {
+    color: var(--text);
+    margin-top: 0.5rem;
+  }
+
+  .cascade-list {
+    list-style: none;
+    margin-top: 0.75rem;
+  }
+
+  .cascade-list li {
+    padding: 0.3rem 0;
+    padding-left: 1.25rem;
+    position: relative;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .cascade-list li::before {
+    content: '↳';
+    position: absolute;
+    left: 0;
+    color: var(--red);
+  }
+
+  /* Score */
+  .score-bar {
+    padding: 1rem;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .score-bar span { color: var(--green); font-weight: 700; }
+
+  /* Prompt screen */
+  .prompt-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    padding: 2rem;
+  }
+
+  .prompt-screen h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: var(--red);
+  }
+
+  .prompt-screen > p {
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+
+  .prompt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  .prompt-grid .scenario-card h3 { font-size: 1rem; }
+
+  @media (max-width: 800px) {
+    .main { grid-template-columns: 1fr; }
+    .panel { max-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="prompt-screen" id="promptScreen">
+  <h1>🔍 Bottleneck Spotter</h1>
+  <p>Look at the architecture. Apply stress. Find where it breaks.</p>
+  <div class="prompt-grid" id="promptGrid"></div>
+</div>
+
+<div class="app" id="mainApp" style="display:none;">
+  <div class="top-bar">
+    <h1>🔍 Bottleneck Spotter</h1>
+    <div class="scenario-info">
+      <div class="scenario-name" id="scenarioTitle"></div>
+      <div class="scenario-desc" id="scenarioSubtitle"></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <button class="btn btn-sm" onclick="resetScenario()">↺ Reset</button>
+      <button class="btn btn-sm" onclick="backToMenu()">← Back</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="diagram-area">
+      <div class="stress-badge" id="stressBadge"></div>
+      <svg class="diagram-svg" id="diagramSvg">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#475569" />
+          </marker>
+          <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+          </marker>
+        </defs>
+        <g id="connectionsGroup"></g>
+        <g id="nodesGroup"></g>
+        <g id="stressGroup"></g>
+      </svg>
+    </div>
+
+    <div class="panel">
+      <div class="panel-tabs">
+        <div class="panel-tab active" onclick="switchPanel('stress')">⚡ Stress</div>
+        <div class="panel-tab" onclick="switchPanel('answer')">🎯 Answer</div>
+        <div class="panel-tab" onclick="switchPanel('results')">📊 Results</div>
+      </div>
+      <div class="panel-content">
+        <div class="panel-section active" id="panel-stress"></div>
+        <div class="panel-section" id="panel-answer"></div>
+        <div class="panel-section" id="panel-results"></div>
+      </div>
+      <div class="score-bar" id="scoreBar">Select a stress condition to begin</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// ARCHITECTURE DATA
+// ============================================
+
+const architectures = [
+  {
+    id: 'web-app',
+    title: 'Standard Web Application',
+    subtitle: 'Load balancer → app servers → database + cache',
+    nodes: [
+      { id: 'users', type: 'users', label: 'Users', x: 400, y: 50, w: 100, h: 50 },
+      { id: 'cdn', type: 'service', label: 'CDN', x: 600, y: 50, w: 90, h: 50 },
+      { id: 'lb', type: 'service', label: 'Load\nBalancer', x: 400, y: 160, w: 110, h: 50 },
+      { id: 'app1', type: 'service', label: 'App Server 1', x: 250, y: 280, w: 120, h: 50 },
+      { id: 'app2', type: 'service', label: 'App Server 2', x: 450, y: 280, w: 120, h: 50 },
+      { id: 'cache', type: 'cache', label: 'Redis Cache', x: 200, y: 410, w: 120, h: 50 },
+      { id: 'db-primary', type: 'database', label: 'DB Primary', x: 400, y: 410, w: 120, h: 55 },
+      { id: 'db-replica', type: 'database', label: 'DB Replica', x: 600, y: 410, w: 120, h: 55 },
+    ],
+    connections: [
+      { from: 'users', to: 'lb', label: 'HTTPS' },
+      { from: 'users', to: 'cdn', label: 'static' },
+      { from: 'lb', to: 'app1' },
+      { from: 'lb', to: 'app2' },
+      { from: 'app1', to: 'cache', label: 'read' },
+      { from: 'app2', to: 'cache', label: 'read' },
+      { from: 'app1', to: 'db-primary', label: 'read/write' },
+      { from: 'app2', to: 'db-primary', label: 'read/write' },
+      { from: 'db-primary', to: 'db-replica', label: 'replication' },
+    ],
+    stresses: [
+      {
+        id: 'traffic-10x',
+        icon: '📈',
+        title: 'Traffic spikes 10×',
+        desc: 'A viral post drives 10× normal traffic in minutes.',
+        bottleneck: 'db-primary',
+        why: 'App servers are stateless and can scale behind the load balancer. But every write and cache-miss read hits the single primary database. At 10× load, the DB connection pool saturates first. Cache helps reads, but write throughput is bounded by one node.',
+        cascades: [
+          'Connection pool exhaustion → app servers queue requests → timeouts',
+          'Slow queries stack up → lock contention increases',
+          'Replication lag grows → replica reads return stale data',
+          'Cache stampede if popular keys expire under load'
+        ],
+        stressNodes: ['db-primary', 'app1', 'app2'],
+        stressConns: [['app1', 'db-primary'], ['app2', 'db-primary']]
+      },
+      {
+        id: 'db-down',
+        icon: '💥',
+        title: 'Primary database goes down',
+        desc: 'The primary DB crashes. Replica is still running.',
+        bottleneck: 'db-primary',
+        why: 'All writes immediately fail. Reads may work if the app can fall back to the replica, but most ORMs and connection strings point to primary. Without automated failover (promoting replica to primary), the entire write path is dead.',
+        cascades: [
+          'All write operations fail immediately',
+          'App servers return 500 errors on any mutation',
+          'Cache entries expire but can\'t be refreshed → growing read failures',
+          'If no auto-failover: full outage until manual intervention'
+        ],
+        stressNodes: ['db-primary'],
+        stressConns: [['app1', 'db-primary'], ['app2', 'db-primary']]
+      },
+      {
+        id: 'cache-gone',
+        icon: '🧊',
+        title: 'Cache fails completely',
+        desc: 'Redis crashes. All cached data gone.',
+        bottleneck: 'db-primary',
+        why: 'Every request that was hitting cache now hits the database directly. This is the "thundering herd" or cache stampede problem. The DB was sized assuming cache absorbs 80-90% of reads — without it, read load jumps 5-10×.',
+        cascades: [
+          'All reads fall through to database',
+          'DB read load spikes 5-10× instantly',
+          'Query latency increases → request timeouts cascade',
+          'App servers exhaust DB connection pools',
+          'Even after cache restarts, cold cache means continued DB pressure'
+        ],
+        stressNodes: ['cache', 'db-primary'],
+        stressConns: [['app1', 'db-primary'], ['app2', 'db-primary'], ['app1', 'cache'], ['app2', 'cache']]
+      },
+      {
+        id: 'write-heavy',
+        icon: '✏️',
+        title: 'Workload shifts write-heavy',
+        desc: 'New feature causes 5× more writes than reads. Think: logging, tracking, user activity.',
+        bottleneck: 'db-primary',
+        why: 'Replica doesn\'t help — it only serves reads. Cache doesn\'t help — writes bypass it. All write pressure lands on the single primary. At this point you need write sharding, a queue to buffer writes, or a different storage engine for the write-heavy data.',
+        cascades: [
+          'Write locks block reads on the primary',
+          'Replication lag grows as primary struggles to keep up',
+          'Cache invalidation storms (every write may invalidate cached data)',
+          'Transaction log / WAL grows faster → disk pressure'
+        ],
+        stressNodes: ['db-primary'],
+        stressConns: [['app1', 'db-primary'], ['app2', 'db-primary'], ['db-primary', 'db-replica']]
+      }
+    ]
+  },
+  {
+    id: 'event-pipeline',
+    title: 'Event Processing Pipeline',
+    subtitle: 'Producers → queue → workers → storage + notifications',
+    nodes: [
+      { id: 'producers', type: 'users', label: 'Event\nProducers', x: 100, y: 200, w: 110, h: 50 },
+      { id: 'api', type: 'service', label: 'Ingestion\nAPI', x: 250, y: 200, w: 110, h: 50 },
+      { id: 'queue', type: 'queue', label: 'Message\nQueue', x: 420, y: 200, w: 120, h: 50 },
+      { id: 'worker1', type: 'service', label: 'Worker 1', x: 600, y: 130, w: 100, h: 45 },
+      { id: 'worker2', type: 'service', label: 'Worker 2', x: 600, y: 200, w: 100, h: 45 },
+      { id: 'worker3', type: 'service', label: 'Worker 3', x: 600, y: 270, w: 100, h: 45 },
+      { id: 'db', type: 'database', label: 'Event Store\n(DB)', x: 770, y: 130, w: 120, h: 55 },
+      { id: 'notif', type: 'service', label: 'Notification\nService', x: 770, y: 250, w: 120, h: 50 },
+      { id: 'dlq', type: 'queue', label: 'Dead Letter\nQueue', x: 420, y: 350, w: 120, h: 50 },
+    ],
+    connections: [
+      { from: 'producers', to: 'api', label: 'events' },
+      { from: 'api', to: 'queue', label: 'enqueue' },
+      { from: 'queue', to: 'worker1' },
+      { from: 'queue', to: 'worker2' },
+      { from: 'queue', to: 'worker3' },
+      { from: 'worker1', to: 'db', label: 'persist' },
+      { from: 'worker2', to: 'db', label: 'persist' },
+      { from: 'worker3', to: 'notif', label: 'trigger' },
+      { from: 'queue', to: 'dlq', label: 'failed' },
+    ],
+    stresses: [
+      {
+        id: 'spike',
+        icon: '🌊',
+        title: 'Event volume spikes 50×',
+        desc: 'Black Friday. Event producers flood the system.',
+        bottleneck: 'queue',
+        why: 'The queue is designed to absorb spikes — that\'s its job. But at 50×, even the queue hits limits: partition throughput caps, disk I/O on the broker, or memory limits. If the queue backs up faster than workers drain it, producer writes start failing at the ingestion API.',
+        cascades: [
+          'Queue depth grows → consumer lag increases → events processed minutes late',
+          'If queue hits storage limit → ingestion API starts rejecting events',
+          'Workers may process stale events, triggering incorrect notifications',
+          'DB write throughput may also saturate under worker pressure',
+          'DLQ fills up if workers can\'t keep up and retry limits are hit'
+        ],
+        stressNodes: ['queue', 'api', 'worker1', 'worker2', 'worker3'],
+        stressConns: [['producers', 'api'], ['api', 'queue']]
+      },
+      {
+        id: 'slow-consumer',
+        icon: '🐢',
+        title: 'Database writes slow down',
+        desc: 'Event store DB starts taking 10× longer per write (bad query, lock contention, disk full).',
+        bottleneck: 'db',
+        why: 'Workers 1 and 2 persist to the DB. When DB writes slow down, workers block waiting for DB responses. They stop pulling from the queue. Queue depth grows. Eventually the queue backs up to the ingestion API. The DB is the downstream bottleneck that propagates upstream via back-pressure.',
+        cascades: [
+          'Workers block on slow DB writes → throughput drops',
+          'Queue depth grows as workers can\'t drain fast enough',
+          'Worker 3 (notification) may still be fine — it doesn\'t write to DB',
+          'If workers have timeouts, events go to DLQ prematurely',
+          'Ingestion API may need to reject or buffer if queue is full'
+        ],
+        stressNodes: ['db', 'worker1', 'worker2'],
+        stressConns: [['worker1', 'db'], ['worker2', 'db']]
+      },
+      {
+        id: 'poison-msg',
+        icon: '☠️',
+        title: 'Poison messages in queue',
+        desc: 'Malformed events that crash workers on processing.',
+        bottleneck: 'worker1',
+        why: 'A poison message gets delivered to a worker, crashes it, returns to the queue, gets delivered to another worker, crashes that one too. Without proper dead-lettering with a max retry count, the same message cycles through all workers, effectively DDoS-ing your own system.',
+        cascades: [
+          'Worker crashes → restarts → picks same message → crashes again',
+          'All workers cycle through the poison message → throughput drops to zero',
+          'Queue backlog grows because nothing is being processed',
+          'DLQ is the escape valve — if configured with max retries',
+          'Without DLQ or max retries: infinite crash loop'
+        ],
+        stressNodes: ['worker1', 'worker2', 'worker3'],
+        stressConns: [['queue', 'worker1'], ['queue', 'worker2'], ['queue', 'worker3']]
+      },
+      {
+        id: 'notif-overload',
+        icon: '📱',
+        title: 'Notification provider rate-limited',
+        desc: 'Email/push provider starts returning 429s. Worker 3 backs up.',
+        bottleneck: 'notif',
+        why: 'Worker 3 is the only path to notifications. When the external provider rate-limits, Worker 3 blocks or retries. But the queue keeps delivering events. Worker 3 falls behind, and notification events queue up. This is a downstream dependency choking an otherwise healthy pipeline.',
+        cascades: [
+          'Worker 3 retries pile up → occupies queue partition',
+          'Notification delay grows from seconds to minutes to hours',
+          'If notifications share a queue with persist events, DB writes also slow',
+          'Users complain about missing notifications before any alert fires',
+          'Need: separate queue partition or circuit breaker for notifications'
+        ],
+        stressNodes: ['notif', 'worker3'],
+        stressConns: [['worker3', 'notif']]
+      }
+    ]
+  },
+  {
+    id: 'microservices',
+    title: 'Microservices with API Gateway',
+    subtitle: 'Gateway → services → databases + external APIs',
+    nodes: [
+      { id: 'clients', type: 'users', label: 'Mobile +\nWeb Clients', x: 380, y: 40, w: 120, h: 50 },
+      { id: 'gateway', type: 'service', label: 'API Gateway', x: 380, y: 150, w: 120, h: 50 },
+      { id: 'auth', type: 'service', label: 'Auth\nService', x: 140, y: 270, w: 110, h: 50 },
+      { id: 'product', type: 'service', label: 'Product\nService', x: 320, y: 270, w: 110, h: 50 },
+      { id: 'order', type: 'service', label: 'Order\nService', x: 500, y: 270, w: 110, h: 50 },
+      { id: 'payment', type: 'service', label: 'Payment\nService', x: 680, y: 270, w: 110, h: 50 },
+      { id: 'auth-db', type: 'database', label: 'Auth DB', x: 100, y: 400, w: 100, h: 50 },
+      { id: 'product-db', type: 'database', label: 'Product DB', x: 290, y: 400, w: 110, h: 50 },
+      { id: 'order-db', type: 'database', label: 'Order DB', x: 490, y: 400, w: 110, h: 50 },
+      { id: 'payment-ext', type: 'external', label: 'Payment\nProvider', x: 680, y: 400, w: 110, h: 50 },
+    ],
+    connections: [
+      { from: 'clients', to: 'gateway', label: 'HTTPS' },
+      { from: 'gateway', to: 'auth', label: 'verify' },
+      { from: 'gateway', to: 'product' },
+      { from: 'gateway', to: 'order' },
+      { from: 'gateway', to: 'payment' },
+      { from: 'auth', to: 'auth-db' },
+      { from: 'product', to: 'product-db' },
+      { from: 'order', to: 'order-db' },
+      { from: 'order', to: 'product', label: 'stock check' },
+      { from: 'payment', to: 'payment-ext', label: 'charge' },
+    ],
+    stresses: [
+      {
+        id: 'auth-slow',
+        icon: '🔐',
+        title: 'Auth service slows to 5s per request',
+        desc: 'Auth DB has a slow query. Every token validation takes 5 seconds.',
+        bottleneck: 'auth',
+        why: 'Every request through the API gateway must authenticate first. If auth takes 5s, every single API call takes at least 5s — regardless of how fast the target service is. Auth is on the critical path for everything. A slow auth service is a slow everything.',
+        cascades: [
+          'Gateway holds connections open waiting for auth → connection pool fills',
+          'All services appear slow to clients (even though they\'re fine)',
+          'Gateway may start returning 503s as connection limits hit',
+          'Clients retry → amplifies the problem',
+          'Fix: auth caching (JWT validation without DB), circuit breaker, or async auth'
+        ],
+        stressNodes: ['auth', 'auth-db', 'gateway'],
+        stressConns: [['gateway', 'auth'], ['auth', 'auth-db']]
+      },
+      {
+        id: 'payment-down',
+        icon: '💳',
+        title: 'Payment provider goes down',
+        desc: 'External payment API returns errors or timeouts.',
+        bottleneck: 'payment-ext',
+        why: 'The payment service depends on an external provider you don\'t control. Without a circuit breaker, the payment service will keep trying and timing out, holding threads and connections. If the order service calls payment synchronously during checkout, the entire checkout flow dies.',
+        cascades: [
+          'Payment service threads blocked on timeout → can\'t serve new requests',
+          'Order service blocks waiting for payment → checkout fails',
+          'Gateway queues order requests → connection pool pressure',
+          'Only payment-related flows should be affected — but without isolation, blast radius grows',
+          'Need: circuit breaker on payment calls, async payment with webhook confirmation'
+        ],
+        stressNodes: ['payment-ext', 'payment', 'order'],
+        stressConns: [['payment', 'payment-ext'], ['gateway', 'payment']]
+      },
+      {
+        id: 'cascade-failure',
+        icon: '🔗',
+        title: 'Order service gets 20× traffic',
+        desc: 'Flash sale. Order endpoint hammered. Order service calls product service for stock checks.',
+        bottleneck: 'order',
+        why: 'Order service takes the direct hit, but it also calls product service synchronously for stock checks. This means the order spike cascades into a product service spike. Two services are now overloaded from one traffic source. This is the classic cascading failure in synchronous microservices.',
+        cascades: [
+          'Order service overwhelmed → response times spike',
+          'Each order request calls product service → product service also overloaded',
+          'Product service slows → order service blocks waiting → amplification loop',
+          'Gateway connection pool fills → all routes affected, not just orders',
+          'Need: rate limiting per route, bulkhead isolation, async stock reservation'
+        ],
+        stressNodes: ['order', 'product', 'order-db', 'product-db'],
+        stressConns: [['gateway', 'order'], ['order', 'product'], ['order', 'order-db']]
+      },
+      {
+        id: 'gateway-spof',
+        icon: '🚪',
+        title: 'API Gateway crashes',
+        desc: 'The single gateway instance has an OOM error.',
+        bottleneck: 'gateway',
+        why: 'The API gateway is a single point of failure. Every client request passes through it. If it crashes, nothing works — even though every backend service is perfectly healthy. This is why gateways need redundancy, health checks, and auto-restart as a minimum.',
+        cascades: [
+          'All client requests fail immediately (connection refused)',
+          'No traffic reaches any service — total outage',
+          'All backend services sit idle',
+          'Recovery depends entirely on gateway restart speed',
+          'Need: multiple gateway instances behind a load balancer or DNS'
+        ],
+        stressNodes: ['gateway'],
+        stressConns: [['clients', 'gateway']]
+      }
+    ]
+  }
+];
+
+// ============================================
+// STATE
+// ============================================
+
+let currentArch = null;
+let currentStress = null;
+let selectedNodeId = null;
+let score = { correct: 0, total: 0 };
+let answeredStresses = new Set();
+
+// ============================================
+// RENDERING
+// ============================================
+
+function renderPromptScreen() {
+  document.getElementById('promptGrid').innerHTML = architectures.map(a => `
+    <div class="scenario-card" onclick="startArchitecture('${a.id}')">
+      <h3>${a.title}</h3>
+      <p>${a.subtitle}</p>
+      <p style="margin-top:0.5rem;color:var(--accent);font-size:0.8rem;">${a.stresses.length} stress scenarios</p>
+    </div>
+  `).join('');
+}
+
+function startArchitecture(id) {
+  currentArch = architectures.find(a => a.id === id);
+  currentStress = null;
+  selectedNodeId = null;
+  score = { correct: 0, total: 0 };
+  answeredStresses = new Set();
+
+  document.getElementById('promptScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'grid';
+  document.getElementById('scenarioTitle').textContent = currentArch.title;
+  document.getElementById('scenarioSubtitle').textContent = currentArch.subtitle;
+
+  renderDiagram();
+  renderStressPanel();
+  renderAnswerPanel();
+  renderResultsPanel();
+  updateScore();
+  switchPanel('stress');
+}
+
+function backToMenu() {
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('promptScreen').style.display = 'flex';
+}
+
+function resetScenario() {
+  if (currentArch) startArchitecture(currentArch.id);
+}
+
+function renderDiagram() {
+  const svg = document.getElementById('diagramSvg');
+  const nodesG = document.getElementById('nodesGroup');
+  const connsG = document.getElementById('connectionsGroup');
+  const stressG = document.getElementById('stressGroup');
+
+  nodesG.innerHTML = '';
+  connsG.innerHTML = '';
+  stressG.innerHTML = '';
+
+  // Draw connections
+  currentArch.connections.forEach(conn => {
+    const from = currentArch.nodes.find(n => n.id === conn.from);
+    const to = currentArch.nodes.find(n => n.id === conn.to);
+    if (!from || !to) return;
+
+    const x1 = from.x + from.w / 2;
+    const y1 = from.y + from.h;
+    const x2 = to.x + to.w / 2;
+    const y2 = to.y;
+
+    // Adjust connection points based on relative positions
+    let fx = from.x + from.w / 2, fy = from.y + from.h / 2;
+    let tx = to.x + to.w / 2, ty = to.y + to.h / 2;
+
+    const dx = tx - fx, dy = ty - fy;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // horizontal
+      fx = dx > 0 ? from.x + from.w : from.x;
+      tx = dx > 0 ? to.x : to.x + to.w;
+    } else {
+      // vertical
+      fy = dy > 0 ? from.y + from.h : from.y;
+      ty = dy > 0 ? to.y : to.y + to.h;
+    }
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', fx);
+    line.setAttribute('y1', fy);
+    line.setAttribute('x2', tx);
+    line.setAttribute('y2', ty);
+    line.setAttribute('class', 'conn-line');
+    line.setAttribute('data-from', conn.from);
+    line.setAttribute('data-to', conn.to);
+    connsG.appendChild(line);
+
+    if (conn.label) {
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', (fx + tx) / 2);
+      label.setAttribute('y', (fy + ty) / 2 - 8);
+      label.setAttribute('class', 'conn-label');
+      label.textContent = conn.label;
+      connsG.appendChild(label);
+    }
+  });
+
+  // Draw nodes
+  currentArch.nodes.forEach(node => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'arch-node');
+    g.setAttribute('data-id', node.id);
+    g.onclick = () => selectNode(node.id);
+
+    const colors = {
+      service: { fill: '#1e293b', stroke: '#3b82f6' },
+      database: { fill: '#1a2e1a', stroke: '#22c55e' },
+      cache: { fill: '#2e1a2e', stroke: '#a855f7' },
+      queue: { fill: '#2e2a1a', stroke: '#f59e0b' },
+      users: { fill: '#1e293b', stroke: '#818cf8' },
+      external: { fill: '#2e1a1a', stroke: '#ef4444' },
+    };
+
+    const c = colors[node.type] || colors.service;
+
+    if (node.type === 'database') {
+      // Cylinder
+      const ry = 8;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', node.x);
+      rect.setAttribute('y', node.y + ry);
+      rect.setAttribute('width', node.w);
+      rect.setAttribute('height', node.h - ry);
+      rect.setAttribute('rx', 4);
+      rect.setAttribute('fill', c.fill);
+      g.appendChild(rect);
+
+      const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ellipse.setAttribute('cx', node.x + node.w / 2);
+      ellipse.setAttribute('cy', node.y + ry);
+      ellipse.setAttribute('rx', node.w / 2);
+      ellipse.setAttribute('ry', ry);
+      ellipse.setAttribute('fill', c.fill);
+      ellipse.setAttribute('stroke', c.stroke);
+      ellipse.setAttribute('stroke-width', '1.5');
+      g.appendChild(ellipse);
+
+      const border = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      border.setAttribute('x', node.x);
+      border.setAttribute('y', node.y + ry);
+      border.setAttribute('width', node.w);
+      border.setAttribute('height', node.h - ry);
+      border.setAttribute('rx', 4);
+      border.setAttribute('class', 'node-border');
+      border.style.stroke = c.stroke;
+      g.appendChild(border);
+    } else {
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', node.x);
+      rect.setAttribute('y', node.y);
+      rect.setAttribute('width', node.w);
+      rect.setAttribute('height', node.h);
+      rect.setAttribute('rx', node.type === 'users' ? 25 : 8);
+      rect.setAttribute('fill', c.fill);
+      g.appendChild(rect);
+
+      const border = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      border.setAttribute('x', node.x);
+      border.setAttribute('y', node.y);
+      border.setAttribute('width', node.w);
+      border.setAttribute('height', node.h);
+      border.setAttribute('rx', node.type === 'users' ? 25 : 8);
+      border.setAttribute('class', 'node-border');
+      border.style.stroke = c.stroke;
+      g.appendChild(border);
+    }
+
+    // Label (multiline support)
+    const lines = node.label.split('\n');
+    lines.forEach((line, i) => {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', node.x + node.w / 2);
+      text.setAttribute('y', node.y + node.h / 2 + (i - (lines.length - 1) / 2) * 15);
+      text.setAttribute('class', 'node-label');
+      text.textContent = line;
+      g.appendChild(text);
+    });
+
+    nodesG.appendChild(g);
+  });
+}
+
+function selectNode(nodeId) {
+  if (!currentStress || answeredStresses.has(currentStress.id)) return;
+
+  selectedNodeId = nodeId;
+
+  document.querySelectorAll('.arch-node').forEach(n => n.classList.remove('selected'));
+  const el = document.querySelector(`[data-id="${nodeId}"]`);
+  if (el) el.classList.add('selected');
+
+  renderAnswerPanel();
+}
+
+// ============================================
+// STRESS PANEL
+// ============================================
+
+function renderStressPanel() {
+  const panel = document.getElementById('panel-stress');
+  panel.innerHTML = `
+    <div style="margin-bottom:1rem;">
+      <div style="font-size:0.85rem;color:var(--muted);line-height:1.5;">
+        Select a stress condition, then click the component in the diagram that breaks first.
+      </div>
+    </div>
+    ${currentArch.stresses.map(s => `
+      <div class="stress-card ${answeredStresses.has(s.id) ? 'answered' : ''}"
+           id="stress-${s.id}"
+           onclick="activateStress('${s.id}')"
+           style="${answeredStresses.has(s.id) ? 'opacity:0.5;pointer-events:none;' : ''}">
+        <h4><span class="stress-icon">${s.icon}</span> ${s.title}</h4>
+        <p>${s.desc}</p>
+      </div>
+    `).join('')}
+  `;
+}
+
+function activateStress(stressId) {
+  currentStress = currentArch.stresses.find(s => s.id === stressId);
+  selectedNodeId = null;
+
+  // Reset node states
+  document.querySelectorAll('.arch-node').forEach(n => {
+    n.classList.remove('selected', 'bottleneck-correct', 'bottleneck-wrong', 'bottleneck-actual');
+  });
+
+  // Highlight stress card
+  document.querySelectorAll('.stress-card').forEach(c => c.classList.remove('active'));
+  document.getElementById(`stress-${stressId}`).classList.add('active');
+
+  // Show stress badge
+  const badge = document.getElementById('stressBadge');
+  badge.textContent = `${currentStress.icon} ${currentStress.title}`;
+  badge.classList.add('visible');
+
+  // Highlight stressed connections
+  document.querySelectorAll('.conn-line').forEach(line => {
+    line.style.stroke = '';
+    line.style.strokeWidth = '';
+    line.removeAttribute('marker-end');
+    line.setAttribute('marker-end', 'url(#arrowhead)');
+  });
+
+  if (currentStress.stressConns) {
+    currentStress.stressConns.forEach(([from, to]) => {
+      const line = document.querySelector(`.conn-line[data-from="${from}"][data-to="${to}"]`);
+      if (line) {
+        line.style.stroke = 'var(--red)';
+        line.style.strokeWidth = '3';
+        line.setAttribute('marker-end', 'url(#arrowhead-red)');
+      }
+    });
+  }
+
+  renderAnswerPanel();
+  switchPanel('answer');
+}
+
+// ============================================
+// ANSWER PANEL
+// ============================================
+
+function renderAnswerPanel() {
+  const panel = document.getElementById('panel-answer');
+
+  if (!currentStress) {
+    panel.innerHTML = '<div class="answer-instruction">Select a stress condition from the Stress tab first.</div>';
+    return;
+  }
+
+  const node = selectedNodeId ? currentArch.nodes.find(n => n.id === selectedNodeId) : null;
+
+  panel.innerHTML = `
+    <div class="answer-prompt">
+      <h3>${currentStress.icon} ${currentStress.title}</h3>
+      <p>${currentStress.desc}</p>
+    </div>
+    <div class="answer-instruction">
+      👆 Click the component in the diagram that breaks first.
+      ${node ? `<br><br>Selected: <strong style="color:var(--amber)">${node.label.replace('\n', ' ')}</strong>` : ''}
+    </div>
+    ${node ? `
+      <div class="submit-area">
+        <button class="btn btn-primary" onclick="submitAnswer()">Submit: ${node.label.replace('\n', ' ')} breaks first</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+function submitAnswer() {
+  if (!currentStress || !selectedNodeId) return;
+
+  const correct = selectedNodeId === currentStress.bottleneck;
+  score.total++;
+  if (correct) score.correct++;
+  answeredStresses.add(currentStress.id);
+
+  // Visual feedback on diagram
+  const selectedEl = document.querySelector(`[data-id="${selectedNodeId}"]`);
+  if (correct) {
+    selectedEl.classList.remove('selected');
+    selectedEl.classList.add('bottleneck-correct');
+  } else {
+    selectedEl.classList.remove('selected');
+    selectedEl.classList.add('bottleneck-wrong');
+    const actualEl = document.querySelector(`[data-id="${currentStress.bottleneck}"]`);
+    if (actualEl) actualEl.classList.add('bottleneck-actual');
+  }
+
+  addResult(correct);
+  updateScore();
+  renderStressPanel();
+  renderResultsPanel();
+  switchPanel('results');
+}
+
+// ============================================
+// RESULTS PANEL
+// ============================================
+
+let results = [];
+
+function addResult(correct) {
+  const bottleneckNode = currentArch.nodes.find(n => n.id === currentStress.bottleneck);
+  const selectedNode = currentArch.nodes.find(n => n.id === selectedNodeId);
+
+  results.push({
+    stress: currentStress,
+    correct,
+    selected: selectedNode,
+    bottleneck: bottleneckNode
+  });
+}
+
+function renderResultsPanel() {
+  const panel = document.getElementById('panel-results');
+
+  if (results.length === 0) {
+    panel.innerHTML = '<div class="answer-instruction">No answers yet. Apply stress conditions and identify bottlenecks.</div>';
+    return;
+  }
+
+  panel.innerHTML = results.map((r, i) => `
+    <div class="result-card ${r.correct ? 'correct' : 'wrong'}">
+      <h4>
+        ${r.correct ? '✅' : '❌'}
+        ${r.stress.icon} ${r.stress.title}
+      </h4>
+      ${!r.correct ? `<p>You picked: <strong>${r.selected.label.replace('\n', ' ')}</strong> → Actual: <strong style="color:var(--amber)">${r.bottleneck.label.replace('\n', ' ')}</strong></p>` : ''}
+      <p class="why">${r.stress.why}</p>
+      <div style="margin-top:0.75rem;">
+        <div style="font-size:0.75rem;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem;font-weight:600;">Cascade Effects</div>
+        <ul class="cascade-list">
+          ${r.stress.cascades.map(c => `<li>${c}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateScore() {
+  const bar = document.getElementById('scoreBar');
+  if (score.total === 0) {
+    bar.innerHTML = 'Select a stress condition to begin';
+  } else {
+    bar.innerHTML = `Score: <span>${score.correct}</span> / ${score.total}  ·  ${currentArch.stresses.length - answeredStresses.size} remaining`;
+  }
+}
+
+// ============================================
+// PANEL SWITCHING
+// ============================================
+
+function switchPanel(name) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-section').forEach(s => s.classList.remove('active'));
+  document.querySelector(`.panel-tab:nth-child(${name === 'stress' ? 1 : name === 'answer' ? 2 : 3})`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+// ============================================
+// INIT
+// ============================================
+
+renderPromptScreen();
+</script>
+</body>
+</html>
