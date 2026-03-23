@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture Whiteboard — Interview Simulator</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --accent: #818cf8;
+    --accent-dim: rgba(129, 140, 248, 0.15);
+    --green: #22c55e;
+    --green-dim: rgba(34, 197, 94, 0.15);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.15);
+    --red: #ef4444;
+    --red-dim: rgba(239, 68, 68, 0.15);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .top-bar h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .timer-area {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .timer {
+    font-size: 1.8rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 5ch;
+    text-align: center;
+  }
+
+  .timer.warning { color: var(--amber); }
+  .timer.danger { color: var(--red); animation: pulse 1s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .timer-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { border-color: var(--accent); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
+
+  /* Main area */
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .phase-list {
+    flex: 1;
+    padding: 1rem;
+  }
+
+  .phase {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .phase.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .phase.completed {
+    border-color: var(--green);
+    opacity: 0.8;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    background: var(--card);
+    user-select: none;
+  }
+
+  .phase-header:hover { background: #2a2d3a; }
+
+  .phase-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .phase-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .phase.active .phase-num { background: var(--accent); color: #fff; }
+  .phase.completed .phase-num { background: var(--green); color: #fff; }
+
+  .phase-time {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .phase-body {
+    padding: 0 1rem 1rem;
+    display: none;
+  }
+
+  .phase.active .phase-body,
+  .phase.expanded .phase-body { display: block; }
+
+  .phase-desc {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+  }
+
+  .hint-list { list-style: none; }
+
+  .hint-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .hint-bullet {
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .hint-text {
+    color: var(--text);
+  }
+
+  .hint-text.hidden-hint {
+    filter: blur(5px);
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.3s;
+  }
+
+  .hint-text.hidden-hint:hover {
+    filter: blur(3px);
+  }
+
+  .hint-text.revealed {
+    filter: none;
+    user-select: auto;
+  }
+
+  .reveal-btn {
+    font-size: 0.75rem;
+    color: var(--accent);
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0.25rem 0;
+    margin-top: 0.25rem;
+  }
+
+  .reveal-btn:hover { text-decoration: underline; }
+
+  /* Workspace */
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .workspace-tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1rem;
+    gap: 0;
+  }
+
+  .workspace-tab {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .workspace-tab:hover { color: var(--text); }
+  .workspace-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .workspace-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .tab-panel {
+    position: absolute;
+    inset: 0;
+    display: none;
+    overflow: auto;
+  }
+
+  .tab-panel.active { display: flex; flex-direction: column; }
+
+  /* Notes panel */
+  .notes-area {
+    flex: 1;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .notes-area textarea {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: none;
+  }
+
+  .notes-area textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .notes-area textarea::placeholder { color: var(--muted); }
+
+  /* Diagram panel */
+  .diagram-area {
+    flex: 1;
+    position: relative;
+  }
+
+  .diagram-canvas {
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  .diagram-toolbar {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: flex;
+    gap: 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.4rem;
+    z-index: 10;
+  }
+
+  .diagram-tool {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.15s;
+  }
+
+  .diagram-tool:hover { background: var(--card); color: var(--text); }
+  .diagram-tool.active { background: var(--accent); color: #fff; }
+
+  /* Checklist panel */
+  .checklist-area {
+    padding: 1.5rem;
+    flex: 1;
+    overflow: auto;
+  }
+
+  .checklist-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .checklist-section h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .check-item:hover { opacity: 0.8; }
+
+  .check-box {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    margin-top: 1px;
+  }
+
+  .check-item.checked .check-box {
+    background: var(--green);
+    border-color: var(--green);
+  }
+
+  .check-item.checked .check-box::after {
+    content: '✓';
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .check-label {
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .check-item.checked .check-label {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+
+  /* Prompt selection */
+  .prompt-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    padding: 2rem;
+  }
+
+  .prompt-screen h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .prompt-screen p {
+    color: var(--muted);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+
+  .prompt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    max-width: 1000px;
+    width: 100%;
+  }
+
+  .prompt-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .prompt-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .prompt-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prompt-card p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .prompt-tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .prompt-tag {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .random-btn {
+    margin-top: 1.5rem;
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .random-btn:hover { opacity: 0.9; }
+
+  /* Review modal */
+  .review-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 2rem;
+  }
+
+  .review-overlay.visible { display: flex; }
+
+  .review-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 2rem;
+  }
+
+  .review-panel h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1.5rem;
+    color: var(--accent);
+  }
+
+  .review-phase {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--card);
+    border-radius: 10px;
+    border-left: 3px solid var(--border);
+  }
+
+  .review-phase.good { border-left-color: var(--green); }
+  .review-phase.partial { border-left-color: var(--amber); }
+  .review-phase.missed { border-left-color: var(--red); }
+
+  .review-phase h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .review-stat {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .review-notes {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+
+  .review-coverage {
+    margin-top: 1rem;
+  }
+
+  .coverage-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+  }
+
+  .coverage-icon { font-size: 0.9rem; }
+
+  @media (max-width: 800px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { max-height: 40vh; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Prompt Selection Screen -->
+<div class="prompt-screen" id="promptScreen">
+  <h1>🏗️ Architecture Whiteboard</h1>
+  <p>Pick a design challenge and practice the 5-step answer shape</p>
+
+  <div class="prompt-grid" id="promptGrid"></div>
+
+  <button class="random-btn" onclick="startRandom()">🎲 Random Challenge</button>
+</div>
+
+<!-- Main Simulator -->
+<div class="app" id="simulatorApp" style="display:none;">
+  <div class="top-bar">
+    <h1 id="challengeTitle">🏗️ Challenge</h1>
+    <div class="timer-area">
+      <div class="timer" id="timerDisplay">35:00</div>
+      <div class="timer-controls">
+        <button class="btn btn-sm" id="timerBtn" onclick="toggleTimer()">▶ Start</button>
+        <button class="btn btn-sm" onclick="resetTimer()">↺ Reset</button>
+        <button class="btn btn-sm" onclick="nextPhase()">Next Phase →</button>
+      </div>
+    </div>
+    <div>
+      <button class="btn btn-sm" onclick="showReview()">📋 Review</button>
+      <button class="btn btn-sm" onclick="backToPrompts()">← Back</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="phase-list" id="phaseList"></div>
+    </div>
+
+    <div class="workspace">
+      <div class="workspace-tabs">
+        <div class="workspace-tab active" onclick="switchTab('notes')">📝 Notes</div>
+        <div class="workspace-tab" onclick="switchTab('diagram')">🔲 Diagram</div>
+        <div class="workspace-tab" onclick="switchTab('checklist')">✅ Coverage</div>
+      </div>
+      <div class="workspace-content">
+        <!-- Notes Tab -->
+        <div class="tab-panel active" id="tab-notes">
+          <div class="notes-area">
+            <textarea id="notesText" placeholder="Start writing your answer here...&#10;&#10;Tip: Use the phases on the left to structure your thinking.&#10;Phase 1 → Clarify requirements&#10;Phase 2 → Propose architecture&#10;Phase 3 → Identify bottlenecks&#10;Phase 4 → Discuss tradeoffs&#10;Phase 5 → Describe evolution"></textarea>
+          </div>
+        </div>
+
+        <!-- Diagram Tab -->
+        <div class="tab-panel" id="tab-diagram">
+          <div class="diagram-area">
+            <div class="diagram-toolbar">
+              <button class="diagram-tool active" data-tool="box" onclick="setDiagramTool('box')" title="Box">▭</button>
+              <button class="diagram-tool" data-tool="arrow" onclick="setDiagramTool('arrow')" title="Arrow">→</button>
+              <button class="diagram-tool" data-tool="text" onclick="setDiagramTool('text')" title="Text">T</button>
+              <button class="diagram-tool" data-tool="db" onclick="setDiagramTool('db')" title="Database">⛁</button>
+              <button class="diagram-tool" data-tool="queue" onclick="setDiagramTool('queue')" title="Queue">≡</button>
+              <button class="diagram-tool" data-tool="user" onclick="setDiagramTool('user')" title="User">👤</button>
+              <button class="diagram-tool" data-tool="move" onclick="setDiagramTool('move')" title="Move">✥</button>
+              <button class="diagram-tool" data-tool="delete" onclick="setDiagramTool('delete')" title="Delete">✕</button>
+              <button class="diagram-tool" onclick="clearDiagram()" title="Clear All">🗑</button>
+            </div>
+            <canvas class="diagram-canvas" id="diagramCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Checklist Tab -->
+        <div class="tab-panel" id="tab-checklist">
+          <div class="checklist-area" id="checklistArea"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Review Overlay -->
+<div class="review-overlay" id="reviewOverlay">
+  <div class="review-panel" id="reviewPanel"></div>
+</div>
+
+<script>
+// ============================================
+// DATA
+// ============================================
+
+const challenges = [
+  {
+    id: 'notification',
+    title: 'Design a Notification System',
+    desc: 'Users trigger events. The system sends notifications via email, push, and in-app. Users have preferences. Delivery doesn\'t need to be instant for every channel. Duplicates are bad.',
+    tags: ['queues', 'async', 'idempotency', 'caching'],
+    phases: [
+      {
+        name: 'Clarify Requirements',
+        time: '5 min',
+        desc: 'What are the product constraints? Who are the users? What channels? What scale?',
+        hints: [
+          'How many users? How many notifications/day?',
+          'Which channels: email, push, in-app, SMS?',
+          'Are there delivery SLAs (e.g. push within 10s)?',
+          'Can users configure preferences per channel?',
+          'Is "at least once" or "exactly once" delivery needed?',
+          'What triggers notifications? User actions? System events? Both?'
+        ]
+      },
+      {
+        name: 'Propose Architecture',
+        time: '10 min',
+        desc: 'Draw the simple first-pass design. Start with the minimum that works.',
+        hints: [
+          'Event source → notification service → delivery workers',
+          'User preference store (relational — structured, queried often)',
+          'Message queue between service and delivery',
+          'Separate workers per channel (email worker, push worker)',
+          'In-app notifications can use a simple read-model table',
+          'Start with a single queue, split by channel later'
+        ]
+      },
+      {
+        name: 'Identify Bottlenecks',
+        time: '5 min',
+        desc: 'Where does this break first? What fails under load?',
+        hints: [
+          'Queue backlog if delivery is slow (email rate limits)',
+          'Database write contention on notification state',
+          'Push notification provider rate limits and failures',
+          'Preference lookups at scale — cache candidate',
+          'Fan-out: one event → many users (viral content, system alerts)',
+          'Duplicate sends if worker crashes mid-delivery'
+        ]
+      },
+      {
+        name: 'Discuss Tradeoffs',
+        time: '10 min',
+        desc: 'Name the tensions explicitly. What did you choose and why?',
+        hints: [
+          'Sync vs async: user action should feel fast → queue delivery',
+          'Availability vs consistency: better to send late than lose notification',
+          'At-least-once vs exactly-once: idempotency keys for dedup',
+          'Single queue vs per-channel queues: simplicity vs isolation',
+          'Eager vs lazy preference loading: cache vs freshness',
+          'Retry strategy: exponential backoff vs dead letter queue'
+        ]
+      },
+      {
+        name: 'Describe Evolution',
+        time: '5 min',
+        desc: 'How does this grow? What would you add next?',
+        hints: [
+          'Priority queues (urgent vs batch)',
+          'Rate limiting per user (don\'t spam)',
+          'Template system for notification content',
+          'Analytics: delivery rates, open rates, click-through',
+          'A/B testing notification content',
+          'Multi-region for latency-sensitive push'
+        ]
+      }
+    ],
+    checklist: {
+      'Data & Storage': [
+        'User preferences storage defined',
+        'Notification state/history storage',
+        'Idempotency key mechanism'
+      ],
+      'Processing': [
+        'Async processing via queue',
+        'Channel-specific delivery workers',
+        'Fan-out strategy for bulk notifications'
+      ],
+      'Reliability': [
+        'Retry & dead letter handling',
+        'Duplicate prevention',
+        'Graceful degradation per channel'
+      ],
+      'Tradeoffs Named': [
+        'Sync vs async delivery',
+        'At-least-once vs exactly-once',
+        'Queue architecture (single vs split)',
+        'Caching preferences vs freshness'
+      ]
+    }
+  },
+  {
+    id: 'url-shortener',
+    title: 'Design a URL Shortener',
+    desc: 'Users submit long URLs and get short ones. Short URLs redirect to the original. Analytics on clicks are a bonus. Think billions of URLs over time.',
+    tags: ['hashing', 'caching', 'read-heavy', 'storage'],
+    phases: [
+      {
+        name: 'Clarify Requirements',
+        time: '5 min',
+        desc: 'What exactly is being built? What scale? What features?',
+        hints: [
+          'How many URLs shortened per day? How many redirects?',
+          'Read:write ratio (heavily read-biased: ~100:1)',
+          'Custom aliases allowed or only generated?',
+          'Do URLs expire?',
+          'Analytics needed (click counts, referrer, geo)?',
+          'URL length target (7 chars = 3.5 trillion combinations with base62)'
+        ]
+      },
+      {
+        name: 'Propose Architecture',
+        time: '10 min',
+        desc: 'The simple version first.',
+        hints: [
+          'API: POST /shorten, GET /:code → 301/302 redirect',
+          'Key generation: hash + truncate, or counter + base62 encode',
+          'Storage: key → original URL (relational or KV store)',
+          'Cache layer: most redirects hit hot URLs',
+          'Stateless API servers behind load balancer',
+          '301 (permanent) vs 302 (temporary) redirect matters for analytics'
+        ]
+      },
+      {
+        name: 'Identify Bottlenecks',
+        time: '5 min',
+        desc: 'Where does this system struggle?',
+        hints: [
+          'Hash collisions — need collision handling or unique ID generation',
+          'Hot URLs hammering a single cache/DB entry',
+          'Database size growing forever if no expiry',
+          'Counter-based IDs: single point of failure if using one counter',
+          'Analytics writes at redirect-time could slow redirects',
+          'Geographic latency for global users'
+        ]
+      },
+      {
+        name: 'Discuss Tradeoffs',
+        time: '10 min',
+        desc: 'Name the tensions.',
+        hints: [
+          'Hash vs counter: collision handling vs coordination',
+          '301 vs 302: browser caching vs analytics accuracy',
+          'Relational vs KV: joins for analytics vs raw speed for lookups',
+          'Inline analytics vs async: redirect speed vs data completeness',
+          'TTL / expiry: storage cost vs "links last forever" expectation',
+          'Caching aggressiveness: latency vs freshness (deleted/updated URLs)'
+        ]
+      },
+      {
+        name: 'Describe Evolution',
+        time: '5 min',
+        desc: 'Growth path.',
+        hints: [
+          'CDN/edge for redirect caching',
+          'Geo-distributed read replicas',
+          'Real-time analytics pipeline (Kafka → aggregation)',
+          'Rate limiting to prevent abuse',
+          'Custom domains',
+          'Sharding by key prefix for write scaling'
+        ]
+      }
+    ],
+    checklist: {
+      'Core Design': [
+        'Key generation strategy defined',
+        'Storage model for URL mapping',
+        'Redirect mechanism (301 vs 302 decision)',
+        'API endpoints specified'
+      ],
+      'Performance': [
+        'Caching strategy for hot URLs',
+        'Read/write ratio acknowledged',
+        'Horizontal scaling approach'
+      ],
+      'Reliability': [
+        'Collision handling',
+        'What happens if DB is down',
+        'URL expiry / cleanup strategy'
+      ],
+      'Tradeoffs Named': [
+        'Hash vs counter-based IDs',
+        '301 vs 302 redirect choice',
+        'Analytics inline vs async',
+        'Storage cost vs permanent URLs'
+      ]
+    }
+  },
+  {
+    id: 'feed',
+    title: 'Design a Social Feed / Timeline',
+    desc: 'Users follow other users. Each user has a home feed of posts from people they follow, ordered by time (or relevance). Think Twitter/Instagram scale concepts.',
+    tags: ['fan-out', 'caching', 'read/write tradeoff', 'denormalization'],
+    phases: [
+      {
+        name: 'Clarify Requirements',
+        time: '5 min',
+        desc: 'What kind of feed? What scale?',
+        hints: [
+          'Chronological or ranked/algorithmic feed?',
+          'How many users? Average followers per user?',
+          'How many posts per day?',
+          'Celebrity problem: users with millions of followers',
+          'Real-time or near-real-time feed updates?',
+          'Just text or media (images, video) too?'
+        ]
+      },
+      {
+        name: 'Propose Architecture',
+        time: '10 min',
+        desc: 'The core feed generation approach.',
+        hints: [
+          'Fan-out-on-write: when user posts, push to all followers\' feed caches',
+          'Fan-out-on-read: when user loads feed, pull from all followed users',
+          'Hybrid: fan-out-on-write for normal users, fan-out-on-read for celebrities',
+          'Feed cache per user (Redis sorted set by timestamp)',
+          'Post storage: separate from feed (post table/document)',
+          'Social graph storage: who follows whom'
+        ]
+      },
+      {
+        name: 'Identify Bottlenecks',
+        time: '5 min',
+        desc: 'Where does this strain?',
+        hints: [
+          'Celebrity posts: fan-out to millions of followers',
+          'Feed cache memory: storing feeds for all users',
+          'Write amplification with fan-out-on-write',
+          'Stale feeds if cache invalidation is slow',
+          'Read latency for fan-out-on-read at scale',
+          'Consistency: deleted post still showing in cached feeds'
+        ]
+      },
+      {
+        name: 'Discuss Tradeoffs',
+        time: '10 min',
+        desc: 'The tensions.',
+        hints: [
+          'Fan-out-on-write vs read: write cost vs read latency',
+          'Memory vs computation: precomputed feeds vs on-demand assembly',
+          'Chronological vs ranked: simpler cache vs engagement optimization',
+          'Consistency vs performance: eventual consistency in feed is usually OK',
+          'Denormalized feed entries vs normalized (join at read time)',
+          'How long to keep feed history in cache'
+        ]
+      },
+      {
+        name: 'Describe Evolution',
+        time: '5 min',
+        desc: 'What comes next.',
+        hints: [
+          'Ranking / relevance algorithm layer',
+          'Real-time feed updates via WebSocket',
+          'Content recommendations beyond followed users',
+          'Geo-distributed feed caches',
+          'Abuse/spam filtering in feed pipeline',
+          'A/B testing different feed algorithms'
+        ]
+      }
+    ],
+    checklist: {
+      'Core Design': [
+        'Fan-out strategy chosen and justified',
+        'Feed storage mechanism defined',
+        'Post storage separate from feed',
+        'Social graph storage approach'
+      ],
+      'Performance': [
+        'Celebrity/hot-user handling',
+        'Caching strategy for feeds',
+        'Read vs write cost balance'
+      ],
+      'Reliability': [
+        'Deleted/edited post propagation',
+        'Feed consistency model',
+        'What happens when cache is cold'
+      ],
+      'Tradeoffs Named': [
+        'Fan-out-on-write vs fan-out-on-read',
+        'Memory vs computation cost',
+        'Consistency vs feed freshness',
+        'Chronological vs ranked ordering'
+      ]
+    }
+  },
+  {
+    id: 'chat',
+    title: 'Design a Chat / Messaging System',
+    desc: 'Users send messages to other users (1:1) and groups. Messages are persistent. Delivery should feel real-time. Read receipts and typing indicators are nice-to-haves.',
+    tags: ['websockets', 'stateful', 'ordering', 'presence'],
+    phases: [
+      {
+        name: 'Clarify Requirements',
+        time: '5 min',
+        desc: 'Scope the problem.',
+        hints: [
+          '1:1 only, or groups too? Max group size?',
+          'Message types: text only, or images/files?',
+          'Delivery guarantees: at-least-once? Ordering guarantees?',
+          'How long are messages stored?',
+          'Online presence / typing indicators needed?',
+          'End-to-end encryption?'
+        ]
+      },
+      {
+        name: 'Propose Architecture',
+        time: '10 min',
+        desc: 'The core messaging flow.',
+        hints: [
+          'WebSocket gateway for real-time connections',
+          'Message service: persist → deliver → acknowledge',
+          'Message storage: per-conversation, ordered by timestamp',
+          'Connection registry: which user is on which server',
+          'Offline message queue: store-and-forward when user is offline',
+          'Group messages: fan-out to group members via their connections'
+        ]
+      },
+      {
+        name: 'Identify Bottlenecks',
+        time: '5 min',
+        desc: 'Stress points.',
+        hints: [
+          'WebSocket server state: connection affinity is inherently stateful',
+          'Message ordering in distributed system',
+          'Group fan-out for large groups',
+          'Connection registry as single point of failure',
+          'Media upload and delivery latency',
+          'Hot conversations (viral group chats)'
+        ]
+      },
+      {
+        name: 'Discuss Tradeoffs',
+        time: '10 min',
+        desc: 'Name the tensions.',
+        hints: [
+          'Stateful connections vs stateless scaling',
+          'Push (WebSocket) vs pull (polling) for delivery',
+          'Per-user message store vs per-conversation store',
+          'Strong ordering vs availability during partitions',
+          'Inline media vs separate media service',
+          'Read receipts: synchronous update vs fire-and-forget'
+        ]
+      },
+      {
+        name: 'Describe Evolution',
+        time: '5 min',
+        desc: 'Next steps.',
+        hints: [
+          'End-to-end encryption',
+          'Message search (full-text index)',
+          'Voice/video call signaling',
+          'Multi-device sync',
+          'Message reactions and threads',
+          'Geo-distributed message routing'
+        ]
+      }
+    ],
+    checklist: {
+      'Core Design': [
+        'Real-time delivery mechanism (WebSocket)',
+        'Message persistence strategy',
+        'Connection/presence tracking',
+        'Offline message handling'
+      ],
+      'Performance': [
+        'Group message fan-out approach',
+        'Message ordering guarantee',
+        'Media handling (separate or inline)'
+      ],
+      'Reliability': [
+        'Delivery acknowledgment flow',
+        'Server failure and reconnection',
+        'Message deduplication'
+      ],
+      'Tradeoffs Named': [
+        'Stateful vs stateless for connections',
+        'Push vs pull delivery',
+        'Ordering vs availability',
+        'Storage model (per-user vs per-conversation)'
+      ]
+    }
+  },
+  {
+    id: 'upload',
+    title: 'Design a File Upload & Processing Pipeline',
+    desc: 'Users upload files (images, documents, videos). Files need processing (thumbnails, transcoding, virus scanning). Processed files are served via CDN. Think Dropbox/Google Drive meets media processing.',
+    tags: ['async', 'queues', 'storage', 'CDN'],
+    phases: [
+      {
+        name: 'Clarify Requirements',
+        time: '5 min',
+        desc: 'What are we handling?',
+        hints: [
+          'File types and size limits?',
+          'Processing needed per type (thumbnails, transcode, scan)?',
+          'Upload frequency and volume?',
+          'Latency tolerance: how fast must processed versions be ready?',
+          'Resumable uploads needed (large files)?',
+          'Access control: public, private, shared?'
+        ]
+      },
+      {
+        name: 'Propose Architecture',
+        time: '10 min',
+        desc: 'The upload and processing flow.',
+        hints: [
+          'Upload service → object storage (S3) → processing queue → workers',
+          'Signed upload URLs (client → S3 direct, skip your servers)',
+          'Processing workers: separate per task (thumbnail, transcode, scan)',
+          'Metadata DB: file info, processing status, user ownership',
+          'CDN in front of object storage for serving',
+          'Webhook/polling for processing completion status'
+        ]
+      },
+      {
+        name: 'Identify Bottlenecks',
+        time: '5 min',
+        desc: 'What breaks?',
+        hints: [
+          'Large file uploads timing out or failing midway',
+          'Video transcoding is CPU-heavy and slow',
+          'Processing queue backlog during spikes',
+          'Storage costs growing unbounded',
+          'Virus scanning as a bottleneck in the pipeline',
+          'CDN cache invalidation when files are updated'
+        ]
+      },
+      {
+        name: 'Discuss Tradeoffs',
+        time: '10 min',
+        desc: 'The tensions.',
+        hints: [
+          'Direct-to-S3 upload vs proxy through your servers (cost vs control)',
+          'Eager vs lazy processing (process on upload vs on first access)',
+          'Processing pipeline ordering: must scan before thumbnail?',
+          'Storage tiers: hot vs cold for old files',
+          'Sync validation vs async: size/type check sync, content processing async',
+          'Cost of storing every version vs on-demand transformation'
+        ]
+      },
+      {
+        name: 'Describe Evolution',
+        time: '5 min',
+        desc: 'Growth path.',
+        hints: [
+          'Resumable/chunked uploads for large files',
+          'Multi-region storage replication',
+          'Smart CDN with on-the-fly image transformation',
+          'ML-based content moderation',
+          'Deduplication (content-addressable storage)',
+          'Tiered storage lifecycle policies'
+        ]
+      }
+    ],
+    checklist: {
+      'Core Design': [
+        'Upload mechanism defined (direct vs proxy)',
+        'Object storage for raw files',
+        'Processing pipeline with queue',
+        'Metadata storage'
+      ],
+      'Performance': [
+        'CDN for serving processed files',
+        'Processing parallelism approach',
+        'Large file handling (chunked/resumable)'
+      ],
+      'Reliability': [
+        'Failed upload recovery',
+        'Processing failure and retry',
+        'Data durability strategy'
+      ],
+      'Tradeoffs Named': [
+        'Direct upload vs proxy',
+        'Eager vs lazy processing',
+        'Storage cost vs availability tiers',
+        'Pipeline ordering constraints'
+      ]
+    }
+  },
+  {
+    id: 'search',
+    title: 'Design a Search System',
+    desc: 'Users type queries and get ranked results. Think product search, document search, or a simplified web search. Results should be fast and relevant.',
+    tags: ['indexing', 'ranking', 'caching', 'read-heavy'],
+    phases: [
+      {
+        name: 'Clarify Requirements',
+        time: '5 min',
+        desc: 'What are we searching?',
+        hints: [
+          'What corpus: products, documents, user-generated content?',
+          'Corpus size: thousands, millions, billions of documents?',
+          'Query volume: searches per second?',
+          'Relevance model: keyword match, semantic, or hybrid?',
+          'Autocomplete / typeahead needed?',
+          'Filters and facets (category, price range, date)?'
+        ]
+      },
+      {
+        name: 'Propose Architecture',
+        time: '10 min',
+        desc: 'Core search pipeline.',
+        hints: [
+          'Inverted index as the core data structure',
+          'Indexing pipeline: source → transform → index',
+          'Search service: parse query → search index → rank → return',
+          'Elasticsearch/Solr as the practical choice (or explain the primitives)',
+          'Separate indexing from serving (write path vs read path)',
+          'Result cache for popular queries'
+        ]
+      },
+      {
+        name: 'Identify Bottlenecks',
+        time: '5 min',
+        desc: 'Where does it struggle?',
+        hints: [
+          'Index build time for large corpus updates',
+          'Ranking computation cost for complex relevance models',
+          'Autocomplete latency requirements (< 100ms)',
+          'Index size exceeding single-node memory',
+          'Stale index: new content not yet searchable',
+          'Query of death: expensive queries consuming all resources'
+        ]
+      },
+      {
+        name: 'Discuss Tradeoffs',
+        time: '10 min',
+        desc: 'Name the tensions.',
+        hints: [
+          'Index freshness vs indexing cost',
+          'Relevance quality vs query latency',
+          'Precision vs recall',
+          'Pre-computed vs query-time scoring',
+          'Sharding by document vs by term',
+          'Cache hit rate vs result freshness'
+        ]
+      },
+      {
+        name: 'Describe Evolution',
+        time: '5 min',
+        desc: 'What comes later.',
+        hints: [
+          'Semantic / vector search alongside keyword',
+          'Personalized ranking',
+          'Learning to rank from click data',
+          'Distributed index with replication',
+          'Query understanding / intent classification',
+          'Spell correction and synonym expansion'
+        ]
+      }
+    ],
+    checklist: {
+      'Core Design': [
+        'Index structure defined (inverted index)',
+        'Indexing pipeline (write path)',
+        'Query pipeline (read path)',
+        'Ranking approach'
+      ],
+      'Performance': [
+        'Result caching for common queries',
+        'Index partitioning strategy',
+        'Autocomplete/typeahead approach'
+      ],
+      'Reliability': [
+        'Index rebuild / recovery',
+        'Handling bad queries gracefully',
+        'Freshness guarantee for new content'
+      ],
+      'Tradeoffs Named': [
+        'Freshness vs indexing cost',
+        'Relevance vs latency',
+        'Precision vs recall',
+        'Pre-computed vs query-time ranking'
+      ]
+    }
+  }
+];
+
+// ============================================
+// STATE
+// ============================================
+
+let currentChallenge = null;
+let currentPhaseIdx = 0;
+let timerInterval = null;
+let timerSeconds = 35 * 60;
+let timerRunning = false;
+let phaseStartTimes = [];
+let phaseNotes = {};
+
+// Diagram state
+let diagramTool = 'box';
+let diagramElements = [];
+let dragState = null;
+let selectedElement = null;
+
+// ============================================
+// PROMPT SCREEN
+// ============================================
+
+function renderPrompts() {
+  document.getElementById('promptGrid').innerHTML = challenges.map(c => `
+    <div class="prompt-card" onclick="startChallenge('${c.id}')">
+      <h3>${c.title}</h3>
+      <p>${c.desc}</p>
+      <div class="prompt-tags">
+        ${c.tags.map(t => `<span class="prompt-tag">${t}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function startChallenge(id) {
+  currentChallenge = challenges.find(c => c.id === id);
+  currentPhaseIdx = 0;
+  timerSeconds = 35 * 60;
+  timerRunning = false;
+  phaseStartTimes = [];
+  phaseNotes = {};
+  diagramElements = [];
+
+  document.getElementById('promptScreen').style.display = 'none';
+  document.getElementById('simulatorApp').style.display = 'grid';
+  document.getElementById('challengeTitle').textContent = '🏗️ ' + currentChallenge.title;
+  document.getElementById('notesText').value = '';
+
+  renderPhases();
+  renderChecklist();
+  updateTimerDisplay();
+  clearDiagram();
+}
+
+function startRandom() {
+  const idx = Math.floor(Math.random() * challenges.length);
+  startChallenge(challenges[idx].id);
+}
+
+function backToPrompts() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  document.getElementById('simulatorApp').style.display = 'none';
+  document.getElementById('promptScreen').style.display = 'flex';
+}
+
+// ============================================
+// PHASES
+// ============================================
+
+function renderPhases() {
+  const list = document.getElementById('phaseList');
+  list.innerHTML = currentChallenge.phases.map((p, i) => `
+    <div class="phase ${i === 0 ? 'active' : ''}" id="phase-${i}" onclick="goToPhase(${i})">
+      <div class="phase-header">
+        <div class="phase-title">
+          <span class="phase-num">${i + 1}</span>
+          ${p.name}
+        </div>
+        <span class="phase-time">${p.time}</span>
+      </div>
+      <div class="phase-body">
+        <div class="phase-desc">${p.desc}</div>
+        <ul class="hint-list">
+          ${p.hints.map((h, hi) => `
+            <li class="hint-item">
+              <span class="hint-bullet">→</span>
+              <span class="hint-text hidden-hint" onclick="event.stopPropagation(); this.classList.toggle('hidden-hint'); this.classList.toggle('revealed');">${h}</span>
+            </li>
+          `).join('')}
+        </ul>
+        <button class="reveal-btn" onclick="event.stopPropagation(); revealAll(${i})">Reveal all hints</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function goToPhase(idx) {
+  // Save current phase notes
+  phaseNotes[currentPhaseIdx] = document.getElementById('notesText').value;
+
+  currentPhaseIdx = idx;
+  document.querySelectorAll('.phase').forEach((p, i) => {
+    p.classList.remove('active');
+    if (i < idx) p.classList.add('completed');
+    if (i === idx) p.classList.add('active');
+  });
+}
+
+function nextPhase() {
+  if (currentPhaseIdx < currentChallenge.phases.length - 1) {
+    phaseStartTimes[currentPhaseIdx + 1] = timerSeconds;
+    goToPhase(currentPhaseIdx + 1);
+  }
+}
+
+function revealAll(phaseIdx) {
+  const phase = document.getElementById(`phase-${phaseIdx}`);
+  phase.querySelectorAll('.hint-text').forEach(h => {
+    h.classList.remove('hidden-hint');
+    h.classList.add('revealed');
+  });
+}
+
+// ============================================
+// TIMER
+// ============================================
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('timerBtn').textContent = '▶ Start';
+  } else {
+    phaseStartTimes[0] = timerSeconds;
+    timerInterval = setInterval(() => {
+      timerSeconds--;
+      if (timerSeconds <= 0) {
+        clearInterval(timerInterval);
+        timerSeconds = 0;
+        timerRunning = false;
+      }
+      updateTimerDisplay();
+    }, 1000);
+    timerRunning = true;
+    document.getElementById('timerBtn').textContent = '⏸ Pause';
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerSeconds = 35 * 60;
+  updateTimerDisplay();
+  document.getElementById('timerBtn').textContent = '▶ Start';
+}
+
+function updateTimerDisplay() {
+  const min = Math.floor(timerSeconds / 60);
+  const sec = timerSeconds % 60;
+  const display = document.getElementById('timerDisplay');
+  display.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+
+  display.classList.remove('warning', 'danger');
+  if (timerSeconds <= 300 && timerSeconds > 60) display.classList.add('warning');
+  if (timerSeconds <= 60) display.classList.add('danger');
+}
+
+// ============================================
+// TABS
+// ============================================
+
+function switchTab(tab) {
+  document.querySelectorAll('.workspace-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.add('active');
+
+  if (tab === 'diagram') {
+    requestAnimationFrame(resizeDiagramCanvas);
+  }
+}
+
+// ============================================
+// CHECKLIST
+// ============================================
+
+function renderChecklist() {
+  const area = document.getElementById('checklistArea');
+  area.innerHTML = Object.entries(currentChallenge.checklist).map(([section, items]) => `
+    <div class="checklist-section">
+      <h3>${section}</h3>
+      ${items.map((item, i) => `
+        <div class="check-item" onclick="this.classList.toggle('checked')">
+          <div class="check-box"></div>
+          <div class="check-label">${item}</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+// ============================================
+// DIAGRAM (simplified box-and-arrow drawing)
+// ============================================
+
+const canvas = document.getElementById('diagramCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeDiagramCanvas() {
+  const parent = canvas.parentElement;
+  canvas.width = parent.clientWidth;
+  canvas.height = parent.clientHeight;
+  renderDiagram();
+}
+
+function setDiagramTool(tool) {
+  diagramTool = tool;
+  document.querySelectorAll('.diagram-tool').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-tool="${tool}"]`)?.classList.add('active');
+  canvas.style.cursor = tool === 'move' ? 'grab' : tool === 'delete' ? 'crosshair' : 'crosshair';
+}
+
+function clearDiagram() {
+  diagramElements = [];
+  renderDiagram();
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (diagramTool === 'delete') {
+    const idx = findElementAt(x, y);
+    if (idx >= 0) {
+      diagramElements.splice(idx, 1);
+      renderDiagram();
+    }
+    return;
+  }
+
+  if (diagramTool === 'move') {
+    const idx = findElementAt(x, y);
+    if (idx >= 0) {
+      selectedElement = idx;
+      const el = diagramElements[idx];
+      dragState = { offsetX: x - el.x, offsetY: y - el.y };
+      canvas.style.cursor = 'grabbing';
+    }
+    return;
+  }
+
+  if (diagramTool === 'text') {
+    const text = prompt('Label:');
+    if (text) {
+      diagramElements.push({ type: 'text', x, y, text });
+      renderDiagram();
+    }
+    return;
+  }
+
+  dragState = { startX: x, startY: y };
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragState) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (diagramTool === 'move' && selectedElement !== null) {
+    const el = diagramElements[selectedElement];
+    el.x = x - dragState.offsetX;
+    el.y = y - dragState.offsetY;
+    renderDiagram();
+    return;
+  }
+
+  renderDiagram();
+  // Preview
+  if (['box', 'db', 'queue', 'user'].includes(diagramTool)) {
+    drawShape(diagramTool, dragState.startX, dragState.startY,
+      x - dragState.startX, y - dragState.startY, 'preview', true);
+  } else if (diagramTool === 'arrow') {
+    drawArrow(dragState.startX, dragState.startY, x, y, true);
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (!dragState) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (diagramTool === 'move') {
+    selectedElement = null;
+    dragState = null;
+    canvas.style.cursor = 'grab';
+    return;
+  }
+
+  if (diagramTool === 'arrow') {
+    if (Math.abs(x - dragState.startX) > 10 || Math.abs(y - dragState.startY) > 10) {
+      diagramElements.push({
+        type: 'arrow',
+        x: dragState.startX, y: dragState.startY,
+        x2: x, y2: y
+      });
+    }
+  } else if (['box', 'db', 'queue', 'user'].includes(diagramTool)) {
+    const w = Math.abs(x - dragState.startX);
+    const h = Math.abs(y - dragState.startY);
+    if (w > 15 && h > 15) {
+      const el = {
+        type: diagramTool,
+        x: Math.min(dragState.startX, x),
+        y: Math.min(dragState.startY, y),
+        w, h
+      };
+      const label = prompt('Label (or leave empty):');
+      if (label !== null) el.label = label;
+      diagramElements.push(el);
+    }
+  }
+
+  dragState = null;
+  renderDiagram();
+});
+
+function findElementAt(x, y) {
+  for (let i = diagramElements.length - 1; i >= 0; i--) {
+    const el = diagramElements[i];
+    if (el.type === 'arrow') {
+      const dist = pointToLineDist(x, y, el.x, el.y, el.x2, el.y2);
+      if (dist < 10) return i;
+    } else if (el.type === 'text') {
+      if (Math.abs(x - el.x) < 50 && Math.abs(y - el.y) < 12) return i;
+    } else {
+      if (x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) return i;
+    }
+  }
+  return -1;
+}
+
+function pointToLineDist(px, py, x1, y1, x2, y2) {
+  const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1;
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  let t = lenSq !== 0 ? dot / lenSq : -1;
+  t = Math.max(0, Math.min(1, t));
+  const xx = x1 + t * C, yy = y1 + t * D;
+  return Math.sqrt((px - xx) ** 2 + (py - yy) ** 2);
+}
+
+function renderDiagram() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  ctx.strokeStyle = '#1e2030';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < canvas.width; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  diagramElements.forEach(el => {
+    if (el.type === 'arrow') {
+      drawArrow(el.x, el.y, el.x2, el.y2, false);
+    } else if (el.type === 'text') {
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '14px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(el.text, el.x, el.y);
+    } else {
+      drawShape(el.type, el.x, el.y, el.w, el.h, el.label, false);
+    }
+  });
+}
+
+function drawShape(type, x, y, w, h, label, preview) {
+  ctx.strokeStyle = preview ? 'rgba(129, 140, 248, 0.5)' : '#818cf8';
+  ctx.fillStyle = preview ? 'rgba(129, 140, 248, 0.05)' : 'rgba(129, 140, 248, 0.1)';
+  ctx.lineWidth = 2;
+
+  if (type === 'db') {
+    ctx.fillStyle = preview ? 'rgba(34, 197, 94, 0.05)' : 'rgba(34, 197, 94, 0.1)';
+    ctx.strokeStyle = preview ? 'rgba(34, 197, 94, 0.5)' : '#22c55e';
+    // Cylinder
+    const ry = Math.min(h * 0.15, 15);
+    ctx.beginPath();
+    ctx.ellipse(x + w/2, y + ry, w/2, ry, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y + ry); ctx.lineTo(x, y + h - ry);
+    ctx.ellipse(x + w/2, y + h - ry, w/2, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + w, y + ry);
+    ctx.fill(); ctx.stroke();
+  } else if (type === 'queue') {
+    ctx.fillStyle = preview ? 'rgba(245, 158, 11, 0.05)' : 'rgba(245, 158, 11, 0.1)';
+    ctx.strokeStyle = preview ? 'rgba(245, 158, 11, 0.5)' : '#f59e0b';
+    // Rounded rect with lines
+    roundRect(x, y, w, h, 6);
+    // Queue lines
+    const segments = 4;
+    for (let i = 1; i < segments; i++) {
+      const lx = x + (w / segments) * i;
+      ctx.beginPath();
+      ctx.moveTo(lx, y + 4);
+      ctx.lineTo(lx, y + h - 4);
+      ctx.strokeStyle = preview ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.4)';
+      ctx.stroke();
+    }
+    ctx.strokeStyle = preview ? 'rgba(245, 158, 11, 0.5)' : '#f59e0b';
+  } else if (type === 'user') {
+    ctx.fillStyle = preview ? 'rgba(129, 140, 248, 0.05)' : 'rgba(129, 140, 248, 0.1)';
+    // Simple person icon shape
+    const cx = x + w/2, cy = y + h * 0.3;
+    const r = Math.min(w, h) * 0.18;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, y + h * 0.75, w * 0.35, h * 0.25, 0, Math.PI, 0, true);
+    ctx.fill(); ctx.stroke();
+  } else {
+    roundRect(x, y, w, h, 8);
+  }
+
+  if (label && !preview) {
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = '13px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + w/2, y + h/2 + (type === 'user' ? h * 0.15 : 0));
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawArrow(x1, y1, x2, y2, preview) {
+  ctx.strokeStyle = preview ? 'rgba(226, 232, 240, 0.4)' : '#e2e8f0';
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  // Arrowhead
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const headLen = 12;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * Math.cos(angle - 0.4), y2 - headLen * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - headLen * Math.cos(angle + 0.4), y2 - headLen * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ============================================
+// REVIEW
+// ============================================
+
+function showReview() {
+  phaseNotes[currentPhaseIdx] = document.getElementById('notesText').value;
+
+  const notes = document.getElementById('notesText').value;
+  const checkedItems = document.querySelectorAll('.check-item.checked').length;
+  const totalItems = document.querySelectorAll('.check-item').length;
+  const elapsed = (35 * 60) - timerSeconds;
+
+  const panel = document.getElementById('reviewPanel');
+  panel.innerHTML = `
+    <h2>📋 Session Review — ${currentChallenge.title}</h2>
+    <div style="margin-bottom:1.5rem;">
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Time Used</div>
+          <div style="font-size:1.5rem;font-weight:700;">${Math.floor(elapsed/60)}:${(elapsed%60).toString().padStart(2,'0')}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Coverage</div>
+          <div style="font-size:1.5rem;font-weight:700;">${checkedItems}/${totalItems}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Phases Visited</div>
+          <div style="font-size:1.5rem;font-weight:700;">${currentPhaseIdx + 1}/${currentChallenge.phases.length}</div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom:1rem;font-size:0.95rem;">Your Notes</h3>
+    <div class="review-phase" style="border-left-color:var(--accent);">
+      <pre class="review-notes">${notes || '(no notes taken)'}</pre>
+    </div>
+
+    <h3 style="margin:1.5rem 0 1rem;font-size:0.95rem;">Coverage Checklist</h3>
+    ${Object.entries(currentChallenge.checklist).map(([section, items]) => `
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.4rem;">${section}</div>
+        ${items.map((item, i) => {
+          const checkItems = document.querySelectorAll('.checklist-section');
+          return `<div style="font-size:0.85rem;padding:0.2rem 0;">${'☐'} ${item}</div>`;
+        }).join('')}
+      </div>
+    `).join('')}
+
+    <div style="text-align:center;margin-top:2rem;">
+      <button class="btn btn-primary" onclick="document.getElementById('reviewOverlay').classList.remove('visible')">Close Review</button>
+    </div>
+  `;
+
+  document.getElementById('reviewOverlay').classList.add('visible');
+}
+
+document.getElementById('reviewOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('reviewOverlay')) {
+    document.getElementById('reviewOverlay').classList.remove('visible');
+  }
+});
+
+// ============================================
+// INIT
+// ============================================
+
+window.addEventListener('resize', () => {
+  if (document.getElementById('tab-diagram').classList.contains('active')) {
+    resizeDiagramCanvas();
+  }
+});
+
+renderPrompts();
+</script>
+</body>
+</html>

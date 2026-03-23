@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tradeoff Cards — Interview Prep</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --left: #2563eb;
+    --left-bg: #1e3a5f;
+    --right: #f59e0b;
+    --right-bg: #4a3520;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --accent: #818cf8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--left), var(--right));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .mode-btn {
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .mode-btn:hover { border-color: var(--accent); }
+  .mode-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .nav-pills {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .nav-pill {
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .nav-pill:hover { color: var(--text); border-color: var(--accent); }
+  .nav-pill.active {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  .card-container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .tradeoff-card {
+    background: var(--surface);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .card-title-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1.5rem;
+    gap: 1rem;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-title-bar h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .vs-badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 0;
+  }
+
+  .side {
+    padding: 1.5rem;
+    transition: all 0.3s;
+  }
+
+  .side-left {
+    border-right: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), transparent);
+  }
+
+  .side-right {
+    background: linear-gradient(135deg, transparent, rgba(245, 158, 11, 0.06));
+  }
+
+  .side h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .side-left h3 { color: var(--left); }
+  .side-right h3 { color: var(--right); }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-left { background: var(--left); }
+  .dot-right { background: var(--right); }
+
+  .detail-section {
+    margin-bottom: 1rem;
+  }
+
+  .detail-section:last-child { margin-bottom: 0; }
+
+  .detail-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+  }
+
+  .detail-text {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--text);
+  }
+
+  .detail-text ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .detail-text li {
+    padding: 0.15rem 0;
+    padding-left: 1rem;
+    position: relative;
+  }
+
+  .detail-text li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .side-left .detail-text li::before { color: var(--left); }
+  .side-right .detail-text li::before { color: var(--right); }
+
+  /* Quiz mode */
+  .quiz-mode .detail-section {
+    cursor: pointer;
+    position: relative;
+  }
+
+  .quiz-mode .detail-text {
+    filter: blur(6px);
+    user-select: none;
+    transition: filter 0.3s;
+  }
+
+  .quiz-mode .detail-section.revealed .detail-text {
+    filter: none;
+    user-select: auto;
+  }
+
+  .quiz-mode .detail-section:not(.revealed)::after {
+    content: 'click to reveal';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 500;
+    opacity: 0.8;
+    pointer-events: none;
+  }
+
+  /* Tension bar */
+  .tension-bar {
+    padding: 0.75rem 1.5rem;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+  }
+
+  .tension-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+  }
+
+  .tension-text {
+    font-size: 0.85rem;
+    color: var(--text);
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  /* Scenario quiz */
+  .scenario-section {
+    max-width: 1100px;
+    margin: 2rem auto 0;
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    display: none;
+  }
+
+  .scenario-section.visible { display: block; }
+
+  .scenario-section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--accent);
+  }
+
+  .scenario {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .scenario-prompt {
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .scenario-options {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+
+  .scenario-opt {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .scenario-opt:hover { border-color: var(--accent); }
+  .scenario-opt.correct { background: #16532d; border-color: #22c55e; }
+  .scenario-opt.wrong { background: #5c1a1a; border-color: #ef4444; }
+
+  .scenario-explain {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.5;
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .scenario-explain.visible { display: block; }
+
+  .score-bar {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+
+  .score-bar span { color: var(--accent); font-weight: 700; }
+
+  @media (max-width: 700px) {
+    body { padding: 1rem; }
+    .card-body { grid-template-columns: 1fr; }
+    .side-left { border-right: none; border-bottom: 1px solid var(--border); }
+    .card-title-bar h2 { font-size: 0.95rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Tradeoff Cards</h1>
+  <p>System design interview prep — recognise the tensions</p>
+</div>
+
+<div class="controls">
+  <button class="mode-btn active" onclick="setMode('study')">📖 Study</button>
+  <button class="mode-btn" onclick="setMode('quiz')">🧠 Quiz (reveal)</button>
+  <button class="mode-btn" onclick="setMode('scenario')">⚡ Scenarios</button>
+</div>
+
+<div class="nav-pills" id="navPills"></div>
+
+<div class="card-container" id="cardContainer"></div>
+
+<div class="scenario-section" id="scenarioSection">
+  <h2>⚡ Which side of the tradeoff?</h2>
+  <div id="scenarioList"></div>
+  <div class="score-bar" id="scoreBar"></div>
+</div>
+
+<script>
+const tradeoffs = [
+  {
+    id: 'latency-throughput',
+    left: {
+      name: 'Latency',
+      what: 'Time for a single request to complete. Measured in ms or seconds. The user feels this directly.',
+      useCases: [
+        'Real-time APIs (search autocomplete, payments)',
+        'User-facing page loads',
+        'Game servers, trading systems',
+        'Anything where perceived speed = UX quality'
+      ],
+      consequences: [
+        'Often requires caching, edge compute, fewer hops',
+        'May limit batch sizes and parallelism',
+        'Can increase infrastructure cost (more instances, closer to user)',
+        'Harder to aggregate or batch-process efficiently'
+      ]
+    },
+    right: {
+      name: 'Throughput',
+      what: 'Total work processed per unit time. Measured in requests/sec, records/sec, MB/s. The system feels this.',
+      useCases: [
+        'Batch data pipelines (ETL, analytics)',
+        'Log ingestion and processing',
+        'Bulk email sends, report generation',
+        'Background workers, queue consumers'
+      ],
+      consequences: [
+        'Individual requests may wait longer (queued, batched)',
+        'Can use bigger, fewer machines more efficiently',
+        'Batching introduces latency by design',
+        'Easier to optimize with parallelism and buffering'
+      ]
+    },
+    tension: 'Optimising for one often hurts the other. Batching increases throughput but adds latency. Serving immediately reduces latency but wastes throughput capacity. The question is: does the user need to feel speed, or does the system need to move volume?'
+  },
+  {
+    id: 'availability-consistency',
+    left: {
+      name: 'Availability',
+      what: 'The system always responds, even if the data might be slightly stale. Uptime is king.',
+      useCases: [
+        'Social media feeds, content platforms',
+        'Shopping cart, product browsing',
+        'DNS, CDN, search indices',
+        'Any system where "down" is worse than "slightly wrong"'
+      ],
+      consequences: [
+        'Users may see stale or inconsistent data temporarily',
+        'Requires conflict resolution strategies (last-write-wins, CRDTs)',
+        'Easier to scale geographically (replicas everywhere)',
+        'Operational complexity in reconciliation'
+      ]
+    },
+    right: {
+      name: 'Consistency',
+      what: 'Every read returns the most recent write. All nodes agree. Data integrity is king.',
+      useCases: [
+        'Banking, payments, financial transactions',
+        'Inventory counts (overselling = real cost)',
+        'User auth and permissions',
+        'Any system where "wrong data" is worse than "slow" or "down"'
+      ],
+      consequences: [
+        'Requests may block or fail during network partitions',
+        'Higher latency (consensus protocols, distributed locks)',
+        'Harder to scale across regions',
+        'Simpler application logic — no conflict resolution needed'
+      ]
+    },
+    tension: 'During a network partition, you must choose: serve potentially stale data (available) or refuse to serve until nodes agree (consistent). Most real systems choose a spectrum, not a binary — e.g. strong consistency for writes, eventual consistency for reads.'
+  },
+  {
+    id: 'stateless-stateful',
+    left: {
+      name: 'Stateless',
+      what: 'Each request carries everything needed. The server keeps nothing between calls. Any instance can handle any request.',
+      useCases: [
+        'REST APIs behind a load balancer',
+        'Serverless functions (Lambda, Cloud Functions)',
+        'Microservices with external state stores',
+        'Horizontally scaled web servers'
+      ],
+      consequences: [
+        'Easy to scale: add instances, no affinity needed',
+        'Easy to replace: any instance dies, no data lost',
+        'State must live somewhere else (DB, cache, client)',
+        'Every request may need a DB/cache lookup (slight latency)'
+      ]
+    },
+    right: {
+      name: 'Stateful',
+      what: 'The server holds session or connection state between requests. Specific instances matter.',
+      useCases: [
+        'WebSocket connections (chat, realtime)',
+        'In-memory caches or session stores',
+        'Database servers themselves',
+        'Game servers maintaining world state'
+      ],
+      consequences: [
+        'Sticky sessions or connection routing required',
+        'Scaling means moving or replicating state',
+        'Instance failure = potential data or session loss',
+        'Can be faster: no external lookup on every request'
+      ]
+    },
+    tension: 'Stateless is the default for scalability and resilience. But state has to live somewhere — pushing it out of the app tier just moves the problem. The real question is: where should state live, and what happens when that thing fails?'
+  },
+  {
+    id: 'relational-nosql',
+    left: {
+      name: 'Relational (SQL)',
+      what: 'Structured tables, schemas, joins, ACID transactions. Data integrity enforced by the database.',
+      useCases: [
+        'Transactional systems (orders, payments, accounts)',
+        'Complex queries across related entities',
+        'Reporting and analytics on structured data',
+        'Systems where schema = contract (team coordination)'
+      ],
+      consequences: [
+        'Schema changes can be painful at scale',
+        'Joins get expensive with large datasets',
+        'Vertical scaling hits limits; horizontal sharding is complex',
+        'Strong guarantees = confidence in data correctness'
+      ]
+    },
+    right: {
+      name: 'NoSQL',
+      what: 'Flexible schemas, optimised for specific access patterns. Document, key-value, column-family, or graph.',
+      useCases: [
+        'High write throughput (logs, events, IoT)',
+        'Hierarchical/nested data (user profiles, content)',
+        'Rapidly evolving schemas (early-stage products)',
+        'Cache-like access patterns (key → value lookups)'
+      ],
+      consequences: [
+        'No joins — denormalization often required',
+        'Application must handle data integrity',
+        'Flexible schema = easy to write garbage',
+        'Horizontal scaling is more natural'
+      ]
+    },
+    tension: 'Relational gives you constraints that prevent mistakes. NoSQL gives you freedom that enables speed. The cost of relational is rigidity; the cost of NoSQL is discipline. Choose based on access patterns and how much you trust your application layer.'
+  },
+  {
+    id: 'replication-sharding',
+    left: {
+      name: 'Replication',
+      what: 'Same data copied to multiple nodes. Improves read availability and fault tolerance. Does NOT increase write capacity.',
+      useCases: [
+        'Read-heavy workloads (content sites, dashboards)',
+        'Geographic distribution (replica near users)',
+        'High availability (failover to replica)',
+        'Disaster recovery'
+      ],
+      consequences: [
+        'Replication lag — reads from replicas may be stale',
+        'Write bottleneck remains (single primary)',
+        'Conflict resolution needed in multi-primary setups',
+        'More storage cost (full copies)'
+      ]
+    },
+    right: {
+      name: 'Sharding',
+      what: 'Data split across nodes by key. Each shard holds a subset. Increases both read AND write capacity.',
+      useCases: [
+        'Write-heavy workloads at scale',
+        'Large datasets that exceed single-node capacity',
+        'Multi-tenant systems (shard by tenant)',
+        'When you need horizontal write scaling'
+      ],
+      consequences: [
+        'Cross-shard queries are expensive or impossible',
+        'Rebalancing shards is operationally painful',
+        'Hot shards (uneven distribution) need careful key design',
+        'Application complexity increases significantly'
+      ]
+    },
+    tension: 'Replication makes reads better and adds resilience. Sharding makes writes scale and handles data volume. They solve different problems and are often combined. Reach for replication first — it\'s simpler. Shard when you must, not when you might.'
+  },
+  {
+    id: 'caching-freshness',
+    left: {
+      name: 'Aggressive Caching',
+      what: 'Store computed/fetched results closer to the consumer. Serve from cache first, hit the source only when needed.',
+      useCases: [
+        'CDN for static assets and pages',
+        'Application-level cache (Redis/Memcached)',
+        'Database query result caching',
+        'API response caching for repeated queries'
+      ],
+      consequences: [
+        'Dramatically reduces latency and DB load',
+        'Users may see stale data',
+        'Cache invalidation is genuinely hard',
+        'Cache stampede risk when TTL expires under load'
+      ]
+    },
+    right: {
+      name: 'Freshness First',
+      what: 'Always serve the latest data. Read from source of truth. Accept the cost in latency and load.',
+      useCases: [
+        'Financial data, account balances',
+        'Inventory / stock levels',
+        'Real-time collaboration (doc editing)',
+        'Anything where stale = wrong = costly'
+      ],
+      consequences: [
+        'Higher latency per request',
+        'More load on databases / source systems',
+        'Simpler mental model — no cache bugs',
+        'May need to scale source aggressively'
+      ]
+    },
+    tension: 'Caching is the most impactful performance optimization, but every cache is a lie waiting to expire. The question is: how stale can this data be before it causes real harm? A product listing can be 5 minutes old. An account balance cannot.'
+  },
+  {
+    id: 'sync-async',
+    left: {
+      name: 'Synchronous',
+      what: 'Caller waits for the response. Request → process → respond, all in one flow. The user sees the result immediately.',
+      useCases: [
+        'User login / authentication',
+        'Read queries the user is waiting for',
+        'Payment authorization (must confirm)',
+        'Form validation and submission'
+      ],
+      consequences: [
+        'Simple mental model — request in, response out',
+        'Caller is blocked: latency directly impacts UX',
+        'Failure propagates immediately (cascading failures)',
+        'Tight coupling between services'
+      ]
+    },
+    right: {
+      name: 'Asynchronous',
+      what: 'Caller fires and moves on. Work happens in the background via queues, events, or callbacks.',
+      useCases: [
+        'Email / notification sending',
+        'Image/video processing after upload',
+        'Analytics event ingestion',
+        'Order fulfillment after payment captured'
+      ],
+      consequences: [
+        'User gets fast acknowledgment, not final result',
+        'Harder to debug — no linear request trace',
+        'Requires queues, workers, retry logic',
+        'More resilient: failures don\'t cascade to the user'
+      ]
+    },
+    tension: 'Sync is simpler and gives immediate feedback. Async is more resilient and decoupled. The key question: does the user need to see the result right now, or just know their request was accepted? Move work async when the answer is "accepted is enough."'
+  }
+];
+
+const scenarios = [
+  {
+    prompt: 'You\'re building an e-commerce product page. Users browse products and see prices, descriptions, and stock status. Which matters more here?',
+    tradeoff: 'availability-consistency',
+    answer: 'left',
+    answerLabel: 'Availability',
+    explain: 'Product browsing should always work, even if a price is a few seconds stale. A page that fails to load loses the sale entirely. Stock can use soft checks here and hard checks at checkout.'
+  },
+  {
+    prompt: 'A user clicks "Place Order" and their payment needs to be processed. Which matters more?',
+    tradeoff: 'availability-consistency',
+    answer: 'right',
+    answerLabel: 'Consistency',
+    explain: 'Payment processing needs strong consistency — you can\'t charge someone twice or show a success that didn\'t happen. It\'s acceptable for this to be slightly slower or occasionally refuse during a partition.'
+  },
+  {
+    prompt: 'Your image upload service needs to generate thumbnails in 3 sizes after users upload photos. How should the thumbnail generation happen?',
+    tradeoff: 'sync-async',
+    answer: 'right',
+    answerLabel: 'Asynchronous',
+    explain: 'The user needs to know their upload succeeded, not wait for all thumbnails. Queue the resize work. Show a placeholder until processing completes. This also lets you retry failed resizes independently.'
+  },
+  {
+    prompt: 'Your app has a settings page where users update their email preferences. When they click Save, what approach?',
+    tradeoff: 'sync-async',
+    answer: 'left',
+    answerLabel: 'Synchronous',
+    explain: 'Settings updates are small, fast writes where the user expects immediate confirmation that it worked. Going async here would add complexity for no benefit and confuse users if preferences seem unchanged.'
+  },
+  {
+    prompt: 'Your blog gets 100x more reads than writes. You need to reduce database load. What\'s the first scaling move?',
+    tradeoff: 'replication-sharding',
+    answer: 'left',
+    answerLabel: 'Replication',
+    explain: 'Read-heavy workloads benefit from read replicas. Replication is simpler to set up and operate. You don\'t need sharding until writes are the bottleneck or data exceeds single-node capacity.'
+  },
+  {
+    prompt: 'Your SaaS platform ingests 50,000 events/second from IoT devices and the single database can\'t keep up with writes. Next move?',
+    tradeoff: 'replication-sharding',
+    answer: 'right',
+    answerLabel: 'Sharding',
+    explain: 'Replication doesn\'t help with write throughput — all replicas still funnel writes to the primary. Shard by device ID or tenant to distribute writes across nodes.'
+  },
+  {
+    prompt: 'You\'re building the API layer for a mobile app. Traffic spikes unpredictably and you need to handle sudden 10x load increases.',
+    tradeoff: 'stateless-stateful',
+    answer: 'left',
+    answerLabel: 'Stateless',
+    explain: 'Stateless services can auto-scale horizontally — spin up 10 more instances behind a load balancer. No session affinity, no state migration. Put state in a managed database or Redis.'
+  },
+  {
+    prompt: 'You need to display a product catalog with prices. Prices change at most once per day. The catalog page is your highest-traffic endpoint.',
+    tradeoff: 'caching-freshness',
+    answer: 'left',
+    answerLabel: 'Aggressive Caching',
+    explain: 'Prices that change daily can be cached aggressively with a reasonable TTL. The traffic volume makes this a huge win for latency and DB load. Set TTL to 5-15 minutes and you\'ll never serve prices more than 15 minutes old.'
+  },
+  {
+    prompt: 'Your app shows users their current account balance. Users deposit and withdraw money throughout the day.',
+    tradeoff: 'caching-freshness',
+    answer: 'right',
+    answerLabel: 'Freshness First',
+    explain: 'Account balances that are stale cause real trust issues — a user might overdraw, or think a deposit didn\'t go through. Always read from the source of truth for financial data.'
+  },
+  {
+    prompt: 'You\'re storing user session data, chat messages, and rapidly evolving user profiles for a social app in early development.',
+    tradeoff: 'relational-nosql',
+    answer: 'right',
+    answerLabel: 'NoSQL',
+    explain: 'Early-stage social apps have fast-changing schemas, nested/hierarchical data (profiles, messages), and key-value access patterns. NoSQL lets you iterate without migration pain. You can add structure later when patterns stabilize.'
+  },
+  {
+    prompt: 'You\'re building an order management system where orders have line items, shipping addresses, payment records, and need monthly financial reports.',
+    tradeoff: 'relational-nosql',
+    answer: 'left',
+    answerLabel: 'Relational (SQL)',
+    explain: 'Orders, line items, payments, and addresses are highly relational. You need joins for reports, ACID for payment accuracy, and schema enforcement across teams. This is textbook relational territory.'
+  },
+  {
+    prompt: 'Your analytics pipeline processes yesterday\'s clickstream data every morning to generate reports. Nobody looks at the reports until 9am.',
+    tradeoff: 'latency-throughput',
+    answer: 'right',
+    answerLabel: 'Throughput',
+    explain: 'No one is waiting in real time — optimize for processing the maximum volume of data efficiently. Batch it, parallelize it, use bigger machines. Individual record latency doesn\'t matter.'
+  }
+];
+
+let currentMode = 'study';
+let activeFilter = 'all';
+let score = { correct: 0, total: 0 };
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const container = document.getElementById('cardContainer');
+  const scenarioEl = document.getElementById('scenarioSection');
+
+  if (mode === 'scenario') {
+    container.style.display = 'none';
+    document.querySelector('.nav-pills').style.display = 'none';
+    scenarioEl.classList.add('visible');
+    renderScenarios();
+  } else {
+    container.style.display = 'block';
+    document.querySelector('.nav-pills').style.display = 'flex';
+    scenarioEl.classList.remove('visible');
+
+    if (mode === 'quiz') {
+      container.classList.add('quiz-mode');
+      document.querySelectorAll('.detail-section').forEach(s => s.classList.remove('revealed'));
+    } else {
+      container.classList.remove('quiz-mode');
+    }
+  }
+}
+
+function renderCards() {
+  const container = document.getElementById('cardContainer');
+  const pills = document.getElementById('navPills');
+
+  pills.innerHTML = '<button class="nav-pill active" onclick="filterCards(\'all\')">All</button>' +
+    tradeoffs.map(t =>
+      `<button class="nav-pill" onclick="filterCards('${t.id}')">${t.left.name} vs ${t.right.name}</button>`
+    ).join('');
+
+  container.innerHTML = tradeoffs.map(t => `
+    <div class="tradeoff-card" data-id="${t.id}">
+      <div class="card-title-bar">
+        <h2>${t.left.name}</h2>
+        <span class="vs-badge">VS</span>
+        <h2>${t.right.name}</h2>
+      </div>
+      <div class="card-body">
+        <div class="side side-left">
+          <h3><span class="dot dot-left"></span>${t.left.name}</h3>
+          <div class="detail-section" onclick="this.classList.toggle('revealed')">
+            <div class="detail-label">What it means</div>
+            <div class="detail-text">${t.left.what}</div>
+          </div>
+          <div class="detail-section" onclick="this.classList.toggle('revealed')">
+            <div class="detail-label">Use when</div>
+            <div class="detail-text"><ul>${t.left.useCases.map(u => `<li>${u}</li>`).join('')}</ul></div>
+          </div>
+          <div class="detail-section" onclick="this.classList.toggle('revealed')">
+            <div class="detail-label">Consequences</div>
+            <div class="detail-text"><ul>${t.left.consequences.map(c => `<li>${c}</li>`).join('')}</ul></div>
+          </div>
+        </div>
+        <div class="side side-right">
+          <h3><span class="dot dot-right"></span>${t.right.name}</h3>
+          <div class="detail-section" onclick="this.classList.toggle('revealed')">
+            <div class="detail-label">What it means</div>
+            <div class="detail-text">${t.right.what}</div>
+          </div>
+          <div class="detail-section" onclick="this.classList.toggle('revealed')">
+            <div class="detail-label">Use when</div>
+            <div class="detail-text"><ul>${t.right.useCases.map(u => `<li>${u}</li>`).join('')}</ul></div>
+          </div>
+          <div class="detail-section" onclick="this.classList.toggle('revealed')">
+            <div class="detail-label">Consequences</div>
+            <div class="detail-text"><ul>${t.right.consequences.map(c => `<li>${c}</li>`).join('')}</ul></div>
+          </div>
+        </div>
+      </div>
+      <div class="tension-bar">
+        <div class="tension-label">The tension</div>
+        <div class="tension-text">${t.tension}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterCards(id) {
+  activeFilter = id;
+  document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+
+  document.querySelectorAll('.tradeoff-card').forEach(card => {
+    card.style.display = (id === 'all' || card.dataset.id === id) ? 'block' : 'none';
+  });
+}
+
+function renderScenarios() {
+  const shuffled = [...scenarios].sort(() => Math.random() - 0.5);
+  score = { correct: 0, total: 0 };
+
+  document.getElementById('scenarioList').innerHTML = shuffled.map((s, i) => {
+    const t = tradeoffs.find(tr => tr.id === s.tradeoff);
+    return `
+      <div class="scenario" id="scenario-${i}">
+        <div class="scenario-prompt">${s.prompt}</div>
+        <div class="scenario-options">
+          <button class="scenario-opt" onclick="checkScenario(${i}, 'left', this)">${t.left.name}</button>
+          <button class="scenario-opt" onclick="checkScenario(${i}, 'right', this)">${t.right.name}</button>
+        </div>
+        <div class="scenario-explain" id="explain-${i}">${s.explain}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('scoreBar').innerHTML = '';
+
+  // Store shuffled order for answer checking
+  window._shuffledScenarios = shuffled;
+}
+
+function checkScenario(i, choice, btn) {
+  const s = window._shuffledScenarios[i];
+  const container = document.getElementById(`scenario-${i}`);
+  const buttons = container.querySelectorAll('.scenario-opt');
+
+  if (container.dataset.answered) return;
+  container.dataset.answered = 'true';
+
+  score.total++;
+
+  if (choice === s.answer) {
+    btn.classList.add('correct');
+    score.correct++;
+  } else {
+    btn.classList.add('wrong');
+    buttons.forEach(b => {
+      if (b.textContent === s.answerLabel) b.classList.add('correct');
+    });
+  }
+
+  document.getElementById(`explain-${i}`).classList.add('visible');
+  document.getElementById('scoreBar').innerHTML = `Score: <span>${score.correct}</span> / ${score.total}`;
+}
+
+renderCards();
+</script>
+</body>
+</html>
