@@ -52,6 +52,4 @@ open whiteboard.html
 
 No build step. No dependencies. Just HTML.
 
-## Context
-
 Built as part of KAL-1252. Strategy doc: `INTERVIEW-PREP-STRATEGY.md` in Slate.
