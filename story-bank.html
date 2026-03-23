@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Bank Explorer — Interview Prep</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --accent: #818cf8;
+    --accent-hover: #6366f1;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --cyan: #06b6d4;
+    --pink: #ec4899;
+  }
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+    background: var(--bg); 
+    color: var(--text); 
+    min-height: 100vh;
+    padding: 2rem;
+  }
+  
+  .header {
+    max-width: 1000px;
+    margin: 0 auto 2rem;
+    text-align: center;
+  }
+  
+  .header h1 {
+    font-size: 1.8rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  
+  .header p {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .main-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .filters-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: sticky;
+    top: 2rem;
+  }
+
+  .filters-panel h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+
+  .filter-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .filter-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  .tag-btn {
+    display: inline-block;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.35rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin: 0 0.4rem 0.4rem 0;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .tag-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .tag-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .stories-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .story-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+
+  .story-card:hover {
+    border-color: var(--accent);
+  }
+
+  .story-header {
+    padding: 1.25rem 1.5rem;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .story-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+
+  .story-meta {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .story-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+
+  .story-tag {
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .tag-concept { background: rgba(245, 158, 11, 0.1); color: var(--amber); }
+  .tag-leadership { background: rgba(34, 197, 94, 0.1); color: var(--green); }
+
+  .story-body {
+    padding: 1.5rem;
+  }
+
+  .star-section {
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .star-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .star-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .star-label.situation { color: var(--muted); }
+  .star-label.task { color: var(--muted); }
+  .star-label.action { color: var(--cyan); }
+  .star-label.result { color: var(--green); }
+  .star-label.tradeoff { color: var(--amber); }
+
+  .star-text {
+    font-size: 0.95rem;
+    color: #cbd5e1;
+  }
+
+  .tradeoff-box {
+    margin-top: 1.25rem;
+    padding: 1rem;
+    background: rgba(245, 158, 11, 0.05);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--muted);
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+  }
+
+  @media (max-width: 768px) {
+    .main-layout {
+      grid-template-columns: 1fr;
+    }
+    .filters-panel {
+      position: static;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📖 Story Bank Explorer</h1>
+  <p>Map theoretical concepts to your actual lived experience using the STAR-T format.</p>
+</div>
+
+<div class="main-layout">
+  <div class="filters-panel">
+    <h3>Filters</h3>
+    <button class="tag-btn active" id="btn-all" onclick="setFilter('all')">All Stories</button>
+    
+    <div class="filter-group" style="margin-top: 1rem;">
+      <div class="filter-label">System Concepts</div>
+      <div id="conceptFilters"></div>
+    </div>
+    
+    <div class="filter-group">
+      <div class="filter-label">Leadership / Soft Skills</div>
+      <div id="leadershipFilters"></div>
+    </div>
+    
+    <div class="filter-group">
+      <div class="filter-label">Companies</div>
+      <div id="companyFilters"></div>
+    </div>
+  </div>
+
+  <div class="stories-container" id="storiesList">
+    <!-- Stories rendered via JS -->
+  </div>
+</div>
+
+<script>
+// ============================================
+// STORY DATA
+// ============================================
+
+const stories = [
+  {
+    id: 'ch-migration-facade',
+    title: 'Incremental E-commerce Migration (Facade Pattern)',
+    company: 'Carolina Herrera',
+    role: 'Technical Lead',
+    tags: ['migration', 'risk-mitigation', 'stateless-stateful', 'architecture', 'leadership'],
+    situation: 'We needed to migrate the Carolina Herrera global e-commerce platform from a legacy Angular/Spartacus stack to a modern Next.js 14/Alokai stack. The business could not tolerate a "big bang" release or extended downtime.',
+    task: 'Design and execute a migration strategy that allowed the new React team to ship value incrementally without breaking the existing Angular site.',
+    action: 'I introduced a Facade routing pattern at the edge. We deployed the new Next.js app alongside the legacy one, routing specific URL paths (like /checkout or /product/*) to the new system while everything else fell back to the old one. I led the bilingual communication between the Spanish dev team and the international middleware vendor to align data structures.',
+    result: 'Zero-downtime migration, progressive developer onboarding to React, and immediate realization of business value on high-priority pages.',
+    tradeoff: 'We traded immediate architectural purity for business continuity. We accepted the temporary operational overhead and latency of maintaining the routing facade to avoid a catastrophic, high-risk "big bang" release.'
+  },
+  {
+    id: 'ch-debugging-collision',
+    title: 'Deep Debugging Under Pressure (CHAL-58)',
+    company: 'Carolina Herrera',
+    role: 'Technical Lead',
+    tags: ['debugging', 'incident-response', 'data-modeling'],
+    situation: 'A recent code change broke critical navigation menus on the live site, causing a minor incident that was called out in a stakeholder meeting.',
+    task: 'Diagnose the root cause rapidly under pressure, fix it, and restore business confidence.',
+    action: 'The initial surface-level diagnosis was to simply remove a new utility function. I refused to accept the surface fix and investigated systematically. I mapped the data flow and found the true root cause: a naming collision between CMS internal identifiers and display text in our component props.',
+    result: 'Implemented a robust fix that not only resolved the menu issue but prevented an entire class of future bugs related to CMS data ingestion.',
+    tradeoff: 'I traded speed-to-fix (applying a band-aid) for correctness. When confidence is shaken, a fully understood root cause is more valuable than a fragile quick fix, even if stakeholders are pushing for immediate resolution.'
+  },
+  {
+    id: 'accenture-alexandria-lead',
+    title: 'Leading the Alexandria AI Platform',
+    company: 'Accenture',
+    role: 'Senior React Dev / Team Lead',
+    tags: ['leadership', 'ai-integration', 'team-building'],
+    situation: 'Accenture needed to build an internal AI chatbot platform ("Alexandria") using React 18, TypeScript, and Redux Toolkit.',
+    task: 'Lead a 10-person frontend team to deliver the MVP within tight corporate constraints.',
+    action: 'Established strict component architecture conventions and code review processes. Bridged the gap between the product vision and technical execution. Used AI agents in my own workflow to accelerate architecture analysis and codebase auditing, setting a standard for the team.',
+    result: 'Successfully shipped the internal AI platform, proving that structured, progressive code review can elevate a mid-level team to ship complex features reliably.',
+    tradeoff: 'As a Tech Lead, I traded my own IC (Individual Contributor) coding velocity for team multiplier effects. It\'s often faster to write it yourself, but you scale by taking the time to review, mentor, and establish conventions.'
+  },
+  {
+    id: 'el-corte-ingles-advocacy',
+    title: 'Navigating Role Misalignment',
+    company: 'El Corte Inglés',
+    role: 'Backend Developer (Nominal)',
+    tags: ['soft-skills', 'self-advocacy', 'career-navigation'],
+    situation: 'I was placed in a role sold as Go/Kafka microservices development, but it turned out to be ~90% operational tech support and XML debugging.',
+    task: 'Exit the mismatched role without burning bridges, looking like a quitter, or damaging my reputation at Accenture.',
+    action: 'Documented the actual work being done versus the role description. Had two professional, direct conversations with the PM outlining the skills mismatch and making the business case that my skills were better utilized elsewhere.',
+    result: 'Successfully transferred to the Carolina Herrera Technical Lead role within 6 months, turning a negative placement into a major career step up.',
+    tradeoff: 'I traded short-term comfort (staying quiet and collecting a paycheck) for long-term career alignment. It requires uncomfortable conversations, but enterprise survival requires active self-advocacy.'
+  },
+  {
+    id: 'sky-nextjs-migration',
+    title: 'Legacy to Next.js Migration at Scale',
+    company: 'Sky Deutschland',
+    role: 'Frontend Developer',
+    tags: ['migration', 'performance', 'caching'],
+    situation: 'Sky Deutschland\'s multinational media platform was running on a slow, difficult-to-maintain legacy architecture.',
+    task: 'Lead the frontend migration to a modern Next.js stack to improve developer velocity and user-facing performance.',
+    action: 'Implemented Next.js features, established new security baselines using SonarQube, and handled multi-language routing for different European markets.',
+    result: 'Improved page load speeds, better SEO through SSR, and a significantly improved developer experience.',
+    tradeoff: 'We traded the familiarity of the old system for the learning curve of SSR/Next.js. Specifically, we had to carefully balance what to render on the server (latency hit) versus what to fetch on the client (layout shift risk).'
+  },
+  {
+    id: 'personal-ai-orchestration',
+    title: 'Multi-Agent Developer Workflow',
+    company: 'Personal / OpenClaw',
+    role: 'AI-Native Engineer',
+    tags: ['ai-integration', 'automation', 'async-sync'],
+    situation: 'Building complex personal projects (Bloom, Canopy, internal orchestration) as a solo developer with limited time.',
+    task: 'Maximize output by leveraging multiple AI models (Claude, Gemini, Codex) simultaneously.',
+    action: 'Built and configured a custom gateway running a 5-agent AI system. I delegate distinct architectural and coding tasks to different agents in parallel, while maintaining the role of orchestrator, reviewer, and final arbiter of system design.',
+    result: 'Collapsed the cost of execution, enabling me to build and deploy 3 public AI-powered tools and complex internal systems that would normally require a small team.',
+    tradeoff: 'I traded manual coding practice for architectural judgment. By letting AI generate boilerplate and logic, I must invest heavily in verifying outputs, reading code, and understanding the broader system design implications.'
+  }
+];
+
+// ============================================
+// STATE & RENDERING
+// ============================================
+
+let activeFilter = 'all';
+
+const conceptTags = ['migration', 'risk-mitigation', 'stateless-stateful', 'architecture', 'data-modeling', 'performance', 'caching', 'automation', 'async-sync'];
+const leadershipTags = ['leadership', 'soft-skills', 'incident-response', 'team-building', 'self-advocacy'];
+const companies = [...new Set(stories.map(s => s.company))];
+
+function initFilters() {
+  const cContainer = document.getElementById('conceptFilters');
+  const lContainer = document.getElementById('leadershipFilters');
+  const comContainer = document.getElementById('companyFilters');
+
+  cContainer.innerHTML = conceptTags.map(tag => 
+    `<button class="tag-btn" onclick="setFilter('${tag}')">${formatTag(tag)}</button>`
+  ).join('');
+
+  lContainer.innerHTML = leadershipTags.map(tag => 
+    `<button class="tag-btn" onclick="setFilter('${tag}')">${formatTag(tag)}</button>`
+  ).join('');
+
+  comContainer.innerHTML = companies.map(comp => 
+    `<button class="tag-btn" onclick="setFilter('company:${comp}')">${comp}</button>`
+  ).join('');
+}
+
+function formatTag(tag) {
+  return tag.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function getTagClass(tag) {
+  if (conceptTags.includes(tag)) return 'tag-concept';
+  if (leadershipTags.includes(tag)) return 'tag-leadership';
+  return '';
+}
+
+function setFilter(filterVal) {
+  activeFilter = filterVal;
+  
+  // Update button states
+  document.querySelectorAll('.tag-btn').forEach(btn => btn.classList.remove('active'));
+  
+  if (filterVal === 'all') {
+    document.getElementById('btn-all').classList.add('active');
+  } else {
+    // Find the button that called this and set it active
+    const btns = document.querySelectorAll('.tag-btn');
+    btns.forEach(btn => {
+      const onclickAttr = btn.getAttribute('onclick');
+      if (onclickAttr && onclickAttr.includes(`'${filterVal}'`)) {
+        btn.classList.add('active');
+      }
+    });
+  }
+
+  renderStories();
+}
+
+function renderStories() {
+  const container = document.getElementById('storiesList');
+  
+  const filtered = stories.filter(s => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter.startsWith('company:')) {
+      return s.company === activeFilter.replace('company:', '');
+    }
+    return s.tags.includes(activeFilter);
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div style="font-size: 2rem; margin-bottom: 1rem;">🔍</div>
+        <h3>No stories found</h3>
+        <p>Try selecting a different filter.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(s => `
+    <div class="story-card">
+      <div class="story-header">
+        <div>
+          <div class="story-title">${s.title}</div>
+          <div class="story-meta">${s.company} • ${s.role}</div>
+          <div class="story-tags">
+            ${s.tags.map(t => `<span class="story-tag ${getTagClass(t)}">${formatTag(t)}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="story-body">
+        <div class="star-section">
+          <div class="star-label situation">Situation</div>
+          <div class="star-text">${s.situation}</div>
+        </div>
+        <div class="star-section">
+          <div class="star-label task">Task</div>
+          <div class="star-text">${s.task}</div>
+        </div>
+        <div class="star-section">
+          <div class="star-label action">Action</div>
+          <div class="star-text">${s.action}</div>
+        </div>
+        <div class="star-section">
+          <div class="star-label result">Result</div>
+          <div class="star-text">${s.result}</div>
+        </div>
+        
+        <div class="tradeoff-box">
+          <div class="star-label tradeoff">The Tradeoff (Interview Closer)</div>
+          <div class="star-text" style="color: var(--text);">${s.tradeoff}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Init
+initFilters();
+renderStories();
+
+</script>
+</body>
+</html>

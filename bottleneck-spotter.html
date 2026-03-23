@@ -800,6 +800,57 @@ let score = { correct: 0, total: 0 };
 let answeredStresses = new Set();
 
 // ============================================
+// PERSISTENCE
+// ============================================
+
+function saveState() {
+  if (!currentArch) return;
+  const state = {
+    archId: currentArch.id,
+    score,
+    answeredStresses: Array.from(answeredStresses),
+    results
+  };
+  localStorage.setItem('bottleneck_state_' + currentArch.id, JSON.stringify(state));
+  localStorage.setItem('bottleneck_active_id', currentArch.id);
+}
+
+function loadState(id) {
+  const saved = localStorage.getItem('bottleneck_state_' + id);
+  if (!saved) return;
+  const state = JSON.parse(saved);
+  
+  currentArch = architectures.find(a => a.id === id);
+  score = state.score;
+  answeredStresses = new Set(state.answeredStresses);
+  results = state.results || [];
+  
+  document.getElementById('promptScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'grid';
+  document.getElementById('scenarioTitle').textContent = currentArch.title;
+  document.getElementById('scenarioSubtitle').textContent = currentArch.subtitle;
+
+  renderDiagram();
+  renderStressPanel();
+  renderAnswerPanel();
+  renderResultsPanel();
+  updateScore();
+  
+  // Highlight already answered nodes
+  results.forEach(r => {
+    const el = document.querySelector(`[data-id="${r.selected.id}"]`);
+    if (el) {
+      if (r.correct) el.classList.add('bottleneck-correct');
+      else el.classList.add('bottleneck-wrong');
+    }
+    if (!r.correct) {
+      const actualEl = document.querySelector(`[data-id="${r.bottleneck.id}"]`);
+      if (actualEl) actualEl.classList.add('bottleneck-actual');
+    }
+  });
+}
+
+// ============================================
 // RENDERING
 // ============================================
 
@@ -831,6 +882,7 @@ function startArchitecture(id) {
   renderResultsPanel();
   updateScore();
   switchPanel('stress');
+  saveState();
 }
 
 function backToMenu() {
@@ -1116,6 +1168,7 @@ function submitAnswer() {
   renderStressPanel();
   renderResultsPanel();
   switchPanel('results');
+  saveState();
 }
 
 // ============================================
@@ -1185,6 +1238,11 @@ function switchPanel(name) {
 // ============================================
 // INIT
 // ============================================
+
+const activeId = localStorage.getItem('bottleneck_active_id');
+if (activeId) {
+  loadState(activeId);
+}
 
 renderPromptScreen();
 </script>

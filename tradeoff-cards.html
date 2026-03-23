@@ -729,6 +729,7 @@ const scenarios = [
 let currentMode = 'study';
 let activeFilter = 'all';
 let score = { correct: 0, total: 0 };
+let wrongAnswers = JSON.parse(localStorage.getItem('tradeoff_wrong_answers') || '{}');
 
 function setMode(mode) {
   currentMode = mode;
@@ -824,7 +825,9 @@ function filterCards(id) {
 }
 
 function renderScenarios() {
-  const shuffled = [...scenarios].sort(() => Math.random() - 0.5);
+  const shuffled = [...scenarios]
+    .sort(() => Math.random() - 0.5)
+    .sort((a, b) => (wrongAnswers[b.tradeoff] || 0) - (wrongAnswers[a.tradeoff] || 0));
   score = { correct: 0, total: 0 };
 
   document.getElementById('scenarioList').innerHTML = shuffled.map((s, i) => {
@@ -862,6 +865,8 @@ function checkScenario(i, choice, btn) {
     score.correct++;
   } else {
     btn.classList.add('wrong');
+    wrongAnswers[s.tradeoff] = (wrongAnswers[s.tradeoff] || 0) + 1;
+    localStorage.setItem('tradeoff_wrong_answers', JSON.stringify(wrongAnswers));
     buttons.forEach(b => {
       if (b.textContent === s.answerLabel) b.classList.add('correct');
     });

@@ -1285,6 +1285,55 @@ let dragState = null;
 let selectedElement = null;
 
 // ============================================
+// PERSISTENCE
+// ============================================
+
+function saveState() {
+  if (!currentChallenge) return;
+  const state = {
+    challengeId: currentChallenge.id,
+    phaseIdx: currentPhaseIdx,
+    timerSeconds,
+    phaseNotes,
+    diagramElements,
+    checkedItems: Array.from(document.querySelectorAll('.check-item')).map(el => el.classList.contains('checked'))
+  };
+  localStorage.setItem('whiteboard_state_' + currentChallenge.id, JSON.stringify(state));
+  localStorage.setItem('whiteboard_active_id', currentChallenge.id);
+}
+
+function loadState(id) {
+  const saved = localStorage.getItem('whiteboard_state_' + id);
+  if (!saved) return;
+  const state = JSON.parse(saved);
+  
+  currentChallenge = challenges.find(c => c.id === id);
+  currentPhaseIdx = state.phaseIdx;
+  timerSeconds = state.timerSeconds;
+  phaseNotes = state.phaseNotes || {};
+  diagramElements = state.diagramElements || [];
+  
+  document.getElementById('promptScreen').style.display = 'none';
+  document.getElementById('simulatorApp').style.display = 'grid';
+  document.getElementById('challengeTitle').textContent = '🏗️ ' + currentChallenge.title;
+  
+  renderPhases();
+  renderChecklist();
+  
+  // Restore checklist
+  const items = document.querySelectorAll('.check-item');
+  state.checkedItems.forEach((checked, i) => {
+    if (checked && items[i]) items[i].classList.add('checked');
+  });
+  
+  // Restore current notes to textarea
+  document.getElementById('notesText').value = phaseNotes[currentPhaseIdx] || '';
+  
+  updateTimerDisplay();
+  renderDiagram();
+}
+
+// ============================================
 // PROMPT SCREEN
 // ============================================
 
@@ -1318,6 +1367,8 @@ function startChallenge(id) {
   renderChecklist();
   updateTimerDisplay();
   clearDiagram();
+  
+  saveState();
 }
 
 function startRandom() {
@@ -1367,12 +1418,10 @@ function goToPhase(idx) {
   // Save current phase notes
   phaseNotes[currentPhaseIdx] = document.getElementById('notesText').value;
 
-  currentPhaseIdx = idx;
-  document.querySelectorAll('.phase').forEach((p, i) => {
-    p.classList.remove('active');
-    if (i < idx) p.classList.add('completed');
-    if (i === idx) p.classList.add('active');
-  });
+  document.getElementById('notesText').value = phaseNotes[currentPhaseIdx] || '';
+
+  renderPhases();
+  saveState();
 }
 
 function nextPhase() {
@@ -1380,6 +1429,7 @@ function nextPhase() {
     phaseStartTimes[currentPhaseIdx + 1] = timerSeconds;
     goToPhase(currentPhaseIdx + 1);
   }
+  saveState();
 }
 
 function revealAll(phaseIdx) {
@@ -1403,6 +1453,7 @@ function toggleTimer() {
     phaseStartTimes[0] = timerSeconds;
     timerInterval = setInterval(() => {
       timerSeconds--;
+      if (timerSeconds % 10 === 0) saveState(); // Auto-save every 10s
       if (timerSeconds <= 0) {
         clearInterval(timerInterval);
         timerSeconds = 0;
@@ -1459,7 +1510,7 @@ function renderChecklist() {
     <div class="checklist-section">
       <h3>${section}</h3>
       ${items.map((item, i) => `
-        <div class="check-item" onclick="this.classList.toggle('checked')">
+        <div class="check-item" onclick="this.classList.toggle('checked'); saveState();">
           <div class="check-box"></div>
           <div class="check-label">${item}</div>
         </div>
@@ -1594,6 +1645,15 @@ canvas.addEventListener('mouseup', (e) => {
 
   dragState = null;
   renderDiagram();
+  saveState();
+});
+
+// Save notes on input
+document.getElementById('notesText').addEventListener('input', () => {
+  if (currentChallenge) {
+    phaseNotes[currentPhaseIdx] = document.getElementById('notesText').value;
+    saveState();
+  }
 });
 
 function findElementAt(x, y) {
@@ -1814,6 +1874,11 @@ window.addEventListener('resize', () => {
     resizeDiagramCanvas();
   }
 });
+
+const activeId = localStorage.getItem('whiteboard_active_id');
+if (activeId) {
+  loadState(activeId);
+}
 
 renderPrompts();
 </script>

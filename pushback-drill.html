@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pushback Drill — Interview Simulator</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --accent: #818cf8;
+    --accent-hover: #6366f1;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+  }
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+    background: var(--bg); 
+    color: var(--text); 
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1.5rem;
+  }
+  
+  .header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  
+  .header h1 {
+    font-size: 1.8rem;
+    color: var(--red);
+    margin-bottom: 0.5rem;
+  }
+  
+  .header p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  .drill-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 800px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    width: 100%;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--red);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .interviewer-panel {
+    padding: 2.5rem;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  .interviewer-avatar {
+    font-size: 2.5rem;
+    line-height: 1;
+    padding: 1rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 50%;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .interviewer-text {
+    flex: 1;
+  }
+
+  .interviewer-role {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .question {
+    font-size: 1.3rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text);
+    margin-bottom: 1rem;
+  }
+
+  .context-tag {
+    display: inline-block;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+  }
+
+  .response-panel {
+    padding: 2.5rem;
+    background: var(--surface);
+  }
+
+  .response-prompt {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .option-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1.25rem;
+    border-radius: 8px;
+    color: var(--text);
+    text-align: left;
+    font-size: 1rem;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .option-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+
+  .option-btn:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  .option-btn.selected-correct {
+    border-color: var(--green);
+    background: rgba(34, 197, 94, 0.05);
+    opacity: 1;
+  }
+
+  .option-btn.selected-wrong {
+    border-color: var(--red);
+    background: rgba(239, 68, 68, 0.05);
+    opacity: 1;
+  }
+
+  .feedback-box {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border-radius: 8px;
+    display: none;
+    animation: slideDown 0.3s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .feedback-correct {
+    background: rgba(34, 197, 94, 0.1);
+    border-left: 4px solid var(--green);
+  }
+
+  .feedback-wrong {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 4px solid var(--red);
+  }
+
+  .feedback-title {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  .feedback-correct .feedback-title { color: var(--green); }
+  .feedback-wrong .feedback-title { color: var(--red); }
+
+  .feedback-text {
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 0.95rem;
+  }
+
+  .next-btn {
+    margin-top: 1.5rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    float: right;
+    transition: background 0.2s;
+  }
+
+  .next-btn:hover {
+    background: var(--accent-hover);
+  }
+
+  .summary-screen {
+    display: none;
+    padding: 3rem;
+    text-align: center;
+  }
+
+  .score-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 8px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 auto 2rem;
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🛑 The Pushback Drill</h1>
+  <p>Interviews aren't just technical exams; they are tests of judgment. A senior engineer doesn't agree with every bad idea the interviewer suggests. Practice defending good architecture politely.</p>
+</div>
+
+<div class="drill-container" id="drillBox">
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="interviewer-panel">
+    <div class="interviewer-avatar">🧐</div>
+    <div class="interviewer-text">
+      <div class="interviewer-role">Staff Engineer / Interviewer</div>
+      <div class="question" id="questionText">Loading...</div>
+      <div class="context-tag" id="contextTag">Context</div>
+    </div>
+  </div>
+
+  <div class="response-panel">
+    <div class="response-prompt">
+      <span>Choose your response:</span>
+      <span id="counterText">1 / 5</span>
+    </div>
+    
+    <div class="options-grid" id="optionsGrid">
+      <!-- Options render here -->
+    </div>
+
+    <div id="feedbackBox" class="feedback-box">
+      <div class="feedback-title" id="feedbackTitle"></div>
+      <div class="feedback-text" id="feedbackText"></div>
+      <button class="next-btn" id="nextBtn" onclick="nextQuestion()">Next Scenario ➔</button>
+      <div style="clear:both;"></div>
+    </div>
+  </div>
+
+  <div class="summary-screen" id="summaryScreen">
+    <h2 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--green);">Drill Complete</h2>
+    <p style="color: var(--muted); margin-bottom: 2rem;">Here is how well you defended the architecture.</p>
+    <div class="score-circle" id="finalScore"></div>
+    <p style="max-width: 500px; margin: 0 auto 2rem; line-height: 1.6; color: var(--text);">
+      Remember: The interviewer is often deliberately suggesting bad ideas to see if you have the experience and confidence to say "no" and explain the tradeoff.
+    </p>
+    <button class="option-btn" style="text-align:center; width: auto; padding: 0.75rem 2rem;" onclick="location.reload()">Restart Drill</button>
+  </div>
+</div>
+
+<script>
+const scenarios = [
+  {
+    tag: "Data Modeling",
+    question: "We're building an internal dashboard. I think we should use MongoDB instead of Postgres here because schemas are too rigid and slow down development.",
+    options: [
+      {
+        text: "I agree, NoSQL is definitely faster to build with. We can use MongoDB and handle any data integrity issues in the application layer as they come up.",
+        correct: false,
+        feedback: "Never agree to NoSQL just because 'schemas are rigid'. Internal dashboards are heavily relational (users, roles, permissions, reporting). The application layer will drown in tech debt trying to recreate SQL joins and constraints."
+      },
+      {
+        text: "Actually, for an internal dashboard where the data is likely highly relational and reporting-heavy, the 'rigidity' of Postgres is a feature, not a bug. It prevents bad data from being written. The upfront cost of a schema saves us massive debugging time later.",
+        correct: true,
+        feedback: "Perfect pushback. You identified that internal tools/dashboards are almost always relational, and you reframed 'rigidity' as 'data integrity'—a classic senior engineering perspective."
+      },
+      {
+        text: "MongoDB doesn't scale well enough for enterprise dashboards. We should use a graph database instead to map the relationships properly.",
+        correct: false,
+        feedback: "You pushed back, but with the wrong logic. MongoDB scales fine, and jumping to a graph DB for a standard dashboard is massive over-engineering."
+      }
+    ]
+  },
+  {
+    tag: "Microservices",
+    question: "This startup is pre-product-market fit. I want to split our codebase into 10 microservices so we are ready to scale when user adoption hits.",
+    options: [
+      {
+        text: "That sounds good. Microservices will let different teams work independently without stepping on each other's toes, which is crucial for scaling.",
+        correct: false,
+        feedback: "A classic junior trap. At pre-PMF, you don't even know what the domain boundaries are yet. Agreeing to microservices here guarantees you'll build the wrong boundaries and spend all your time on infrastructure instead of product."
+      },
+      {
+        text: "I wouldn't use 10 microservices, maybe just 3 or 4. We should split it by frontend, backend, auth, and database to keep it manageable.",
+        correct: false,
+        feedback: "A weak compromise. 'Frontend, backend, database' isn't microservices, it's just standard N-tier architecture. You missed the opportunity to push back on the core premise."
+      },
+      {
+        text: "I strongly advise against that. Pre-product-market fit, our biggest risk is building the wrong thing, not scaling. A modular monolith allows us to refactor boundaries quickly as requirements change. We can extract services later if specific parts actually bottleneck.",
+        correct: true,
+        feedback: "Excellent. You identified the actual risk (building the wrong thing) and proposed 'modular monolith', which shows you understand architecture evolution and business context."
+      }
+    ]
+  },
+  {
+    tag: "Caching",
+    question: "Users are complaining the checkout flow is a bit slow. Let's throw Redis in front of the payment authorization API to cache the responses and speed it up.",
+    options: [
+      {
+        text: "Hold on. Payment authorization is highly stateful and transactional. Caching a payment response could result in double-charging or falsely approving failed cards. We need to optimize the DB queries or external API calls instead.",
+        correct: true,
+        feedback: "Spot on. Caching financial/transactional data is incredibly dangerous. You correctly identified the boundary where the 'cache everything' rule breaks down."
+      },
+      {
+        text: "Great idea. We can set a very short TTL, like 5 seconds, so the data doesn't get too stale, but we still get the latency benefits during traffic spikes.",
+        correct: false,
+        feedback: "Dangerous! Even a 1-second cache on payment authorization means if a user clicks 'Buy' twice, the second click might hit the cache of the first success, skipping the actual payment gateway entirely."
+      },
+      {
+        text: "Redis is a good choice, but Memcached might be faster for simple key-value lookups like this.",
+        correct: false,
+        feedback: "You got distracted by tool selection (Redis vs Memcached) and completely missed the massive architectural hazard of caching a payment authorization."
+      }
+    ]
+  },
+  {
+    tag: "Over-engineering",
+    question: "We need a simple cron job to send a daily digest email to our 500 users. I'm thinking we set up a Kubernetes cluster running Apache Kafka to ensure exactly-once delivery.",
+    options: [
+      {
+        text: "Kafka is great for exactly-once delivery, but Kubernetes is overkill. We can just run Kafka on bare metal EC2 instances to save DevOps time.",
+        correct: false,
+        feedback: "Kafka is the overkill here, not just Kubernetes! For 500 daily emails, a simple script running on a server or a single Lambda function is enough."
+      },
+      {
+        text: "For 500 users, that is massive overkill and adds a huge operational burden. A simple scheduled Lambda function or a Node.js script using an established provider like SendGrid handles retries and bounces out of the box with near-zero infra maintenance.",
+        correct: true,
+        feedback: "Exactly. You called out the operational burden and proposed a boring, managed, cheap solution that perfectly fits the actual scale (500 users)."
+      },
+      {
+        text: "If we use Kafka, we should also implement an event-sourcing pattern so we have an immutable log of every email ever sent.",
+        correct: false,
+        feedback: "You just took the interviewer's over-engineering bait and doubled it. You are now building a data streaming platform instead of sending an email."
+      }
+    ]
+  },
+  {
+    tag: "Consistency",
+    question: "For our new social media feed, I want to use Two-Phase Commit (2PC) across our databases to ensure every user sees the exact same like-count on a post at the exact same millisecond.",
+    options: [
+      {
+        text: "That makes sense. If users see different like counts, they'll think the app is broken. We need strong consistency here.",
+        correct: false,
+        feedback: "No. Social media feeds are the textbook example for Eventual Consistency. Users don't actually care if a like count is off by 3 for a few seconds. The latency hit of 2PC would ruin the UX."
+      },
+      {
+        text: "We should use a saga pattern instead of Two-Phase Commit to handle distributed transactions better.",
+        correct: false,
+        feedback: "You're debating *how* to implement strong consistency, rather than challenging *whether* we need it. For a 'like' count, we don't."
+      },
+      {
+        text: "I'd push back on that requirement. For a social feed, Availability and low latency are far more important than Strong Consistency. If a 'like' count is off by a few seconds across regions, it doesn't impact the business. We should use Eventual Consistency and prioritize fast page loads.",
+        correct: true,
+        feedback: "Perfect. You applied the Availability vs. Consistency tradeoff correctly to the product context, prioritizing the user's perception of speed over mathematical correctness for non-critical data."
+      }
+    ]
+  }
+];
+
+let currentIdx = 0;
+let score = 0;
+let stateAnswers = JSON.parse(localStorage.getItem('pushback_drill_state') || '{}');
+
+function init() {
+  // Shuffle scenarios
+  scenarios.sort(() => Math.random() - 0.5);
+  // Shuffle options within scenarios
+  scenarios.forEach(s => s.options.sort(() => Math.random() - 0.5));
+  loadScenario();
+}
+
+function loadScenario() {
+  const s = scenarios[currentIdx];
+  
+  document.getElementById('progressFill').style.width = `${(currentIdx / scenarios.length) * 100}%`;
+  document.getElementById('counterText').textContent = `${currentIdx + 1} / ${scenarios.length}`;
+  document.getElementById('contextTag').textContent = s.tag;
+  document.getElementById('questionText').textContent = `"${s.question}"`;
+  
+  const grid = document.getElementById('optionsGrid');
+  grid.innerHTML = s.options.map((opt, idx) => `
+    <button class="option-btn" onclick="selectOption(${idx})" id="opt-${idx}">
+      ${opt.text}
+    </button>
+  `).join('');
+  
+  document.getElementById('feedbackBox').style.display = 'none';
+}
+
+function selectOption(optIdx) {
+  const s = scenarios[currentIdx];
+  const selected = s.options[optIdx];
+  const isCorrect = selected.correct;
+  
+  if (isCorrect) score++;
+  
+  // Disable all buttons
+  const btns = document.querySelectorAll('.option-btn');
+  btns.forEach(b => b.disabled = true);
+  
+  // Highlight chosen
+  const chosenBtn = document.getElementById(`opt-${optIdx}`);
+  chosenBtn.classList.add(isCorrect ? 'selected-correct' : 'selected-wrong');
+  
+  // If wrong, highlight the correct one too
+  if (!isCorrect) {
+    const correctIdx = s.options.findIndex(o => o.correct);
+    document.getElementById(`opt-${correctIdx}`).style.borderColor = 'var(--green)';
+    document.getElementById(`opt-${correctIdx}`).style.borderWidth = '2px';
+  }
+  
+  // Show feedback
+  const fBox = document.getElementById('feedbackBox');
+  fBox.className = `feedback-box ${isCorrect ? 'feedback-correct' : 'feedback-wrong'}`;
+  
+  document.getElementById('feedbackTitle').textContent = isCorrect ? '✅ Good Pushback' : '❌ Missed the Trap';
+  document.getElementById('feedbackText').textContent = selected.feedback;
+  fBox.style.display = 'block';
+  
+  // Change button text if it's the last question
+  if (currentIdx === scenarios.length - 1) {
+    document.getElementById('nextBtn').textContent = 'See Results';
+  }
+}
+
+function nextQuestion() {
+  currentIdx++;
+  if (currentIdx >= scenarios.length) {
+    showSummary();
+  } else {
+    loadScenario();
+  }
+}
+
+function showSummary() {
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('interviewer-panel').style.display = 'none';
+  document.querySelector('.response-panel').style.display = 'none';
+  
+  const summary = document.getElementById('summaryScreen');
+  summary.style.display = 'block';
+  
+  const pct = Math.round((score / scenarios.length) * 100);
+  const circle = document.getElementById('finalScore');
+  circle.textContent = `${score}/${scenarios.length}`;
+  
+  if (pct === 100) {
+    circle.style.borderColor = 'var(--green)';
+    circle.style.color = 'var(--green)';
+  } else if (pct >= 60) {
+    circle.style.borderColor = 'var(--amber)';
+    circle.style.color = 'var(--amber)';
+  }
+  
+  // Save completion state
+  localStorage.setItem('pushback_drill_complete', 'true');
+}
+
+// Start
+init();
+
+</script>
+</body>
+</html>

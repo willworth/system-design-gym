@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Evolution Slider</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22252f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --accent: #818cf8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+  }
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+    background: var(--bg); 
+    color: var(--text); 
+    height: 100vh; 
+    display: grid; 
+    grid-template-rows: auto 1fr auto; 
+    overflow: hidden;
+  }
+  
+  .top-bar { 
+    padding: 1rem 1.5rem; 
+    background: var(--surface); 
+    border-bottom: 1px solid var(--border); 
+  }
+  
+  .top-bar h1 { 
+    color: var(--green); 
+    font-size: 1.2rem; 
+  }
+  
+  .main { 
+    display: grid; 
+    grid-template-columns: 1fr 380px; 
+    overflow: hidden; 
+  }
+  
+  .diagram-area { 
+    position: relative; 
+    background: var(--bg); 
+  }
+  
+  svg { 
+    width: 100%; 
+    height: 100%; 
+  }
+  
+  .sidebar { 
+    background: var(--surface); 
+    border-left: 1px solid var(--border); 
+    padding: 1.5rem; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 1rem; 
+    overflow-y: auto;
+  }
+  
+  .slider-container { 
+    padding: 1.5rem; 
+    background: var(--card); 
+    border-top: 1px solid var(--border); 
+    display: flex; 
+    align-items: center; 
+    gap: 1.5rem; 
+  }
+  
+  input[type=range] { 
+    flex: 1; 
+    accent-color: var(--accent); 
+    cursor: pointer;
+  }
+  
+  .traffic-label { 
+    width: 110px; 
+    font-variant-numeric: tabular-nums; 
+    font-weight: bold; 
+    font-size: 1.1rem;
+    color: var(--accent);
+  }
+  
+  .node-rect { 
+    fill: var(--card); 
+    stroke: #3b82f6; 
+    stroke-width: 2; 
+    rx: 8; 
+    transition: all 0.3s; 
+  }
+  
+  .node-db { stroke: #22c55e; }
+  .node-cache { stroke: #a855f7; }
+  .node-queue { stroke: #f59e0b; }
+  .node-users { stroke: #e2e8f0; rx: 25; }
+  
+  .node-text { 
+    fill: var(--text); 
+    font-size: 13px; 
+    text-anchor: middle; 
+    dominant-baseline: central; 
+    pointer-events: none; 
+    font-family: -apple-system, sans-serif;
+  }
+  
+  .conn-line { 
+    stroke: var(--border); 
+    stroke-width: 2; 
+    fill: none; 
+    marker-end: url(#arrowhead); 
+    transition: all 0.3s;
+  }
+  
+  .conn-label { 
+    fill: var(--muted); 
+    font-size: 11px; 
+    text-anchor: middle; 
+  }
+  
+  .bottleneck { 
+    stroke: var(--red) !important; 
+    animation: pulse 1s infinite; 
+    fill: rgba(239, 68, 68, 0.1); 
+  }
+  
+  @keyframes pulse { 
+    0%, 100% { stroke-width: 2; } 
+    50% { stroke-width: 5; } 
+  }
+  
+  .upgrade-btn { 
+    display: block; 
+    width: 100%; 
+    padding: 0.85rem; 
+    margin-bottom: 0.5rem; 
+    background: var(--card); 
+    border: 1px solid var(--border); 
+    color: var(--text); 
+    border-radius: 8px; 
+    cursor: pointer; 
+    text-align: left; 
+    font-size: 0.95rem;
+    transition: all 0.2s;
+  }
+  
+  .upgrade-btn:hover:not(:disabled) { 
+    border-color: var(--accent); 
+    background: #2a2d3a;
+  }
+  
+  .upgrade-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  .upgrade-correct { 
+    border-color: var(--green) !important; 
+    background: rgba(34,197,94,0.1) !important; 
+  }
+  
+  .upgrade-wrong { 
+    border-color: var(--red) !important; 
+    background: rgba(239,68,68,0.1) !important; 
+  }
+  
+  .panel-box { 
+    background: var(--card); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    padding: 1.25rem; 
+  }
+  
+  .feedback { 
+    margin-top: 1rem; 
+    font-size: 0.9rem; 
+    color: var(--text); 
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>📈 System Evolution Slider</h1>
+  <p style="font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem;">Drag the traffic slider up. When a component bottlenecks, apply the right architectural upgrade to unblock it.</p>
+</div>
+
+<div class="main">
+  <div class="diagram-area" id="diagram">
+    <svg>
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#334155" />
+        </marker>
+      </defs>
+      <g id="connsG"></g>
+      <g id="nodesG"></g>
+    </svg>
+  </div>
+  
+  <div class="sidebar">
+    <div class="panel-box" id="instructions">
+      <h3 style="margin-bottom: 0.5rem; color: var(--green);">Status: Healthy</h3>
+      <p style="font-size: 0.9rem; color: var(--muted);">The system is handling the current load effortlessly. Use the slider below to increase traffic.</p>
+    </div>
+    
+    <div class="panel-box" id="bottleneckPanel" style="display: none; border-color: var(--red);">
+      <h3 style="color: var(--red); margin-bottom: 0.75rem;">🔥 Bottleneck Reached</h3>
+      <p id="bottleneckMsg" style="font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.5;"></p>
+      <div id="upgradesList"></div>
+      <div id="feedback" class="feedback"></div>
+    </div>
+  </div>
+</div>
+
+<div class="slider-container">
+  <div style="font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Traffic Scale</div>
+  <input type="range" id="trafficSlider" min="0" max="100" value="0">
+  <div class="traffic-label" id="trafficLabel">0 RPS</div>
+</div>
+
+<script>
+// Logic & State
+const stages = [
+  {
+    threshold: 20,
+    node: 'db',
+    msg: "Database CPU is at 100%. App servers are timing out waiting for read queries. You need to reduce read load on the database.",
+    upgrades: [
+      { id: 'cache', label: 'Add Redis Cache', correct: true, explain: "A cache sits in front of the database and absorbs repetitive read queries. This is the cheapest, highest-impact way to protect a database." },
+      { id: 'replica', label: 'Add Read Replica', correct: false, explain: "A read replica works, but caching is usually the first line of defense for read-heavy API traffic before adding DB replication complexity." },
+      { id: 'shard', label: 'Shard the Database', correct: false, explain: "Sharding is an extreme measure for write-scaling or dataset size, not a first step for read-scaling." }
+    ],
+    apply: () => {
+      arch.nodes.push({ id: 'cache', label: 'Redis Cache', type: 'cache', x: 200, y: 300, w: 110, h: 50 });
+      arch.conns.push({ from: 'app', to: 'cache', label: 'reads' });
+    }
+  },
+  {
+    threshold: 40,
+    node: 'app',
+    msg: "Users are uploading images. The app servers are blocking all threads doing heavy synchronous image resizing, unable to serve other requests.",
+    upgrades: [
+      { id: 'more-app', label: 'Add more app servers', correct: false, explain: "Scaling horizontally helps temporarily, but the core issue is tying up web threads with heavy sync processing." },
+      { id: 'queue', label: 'Add Message Queue + Worker', correct: true, explain: "Moving processing to an asynchronous queue frees up the app servers to respond to users immediately." }
+    ],
+    apply: () => {
+      arch.nodes.push({ id: 'queue', label: 'Message Queue', type: 'queue', x: 600, y: 150, w: 120, h: 50 });
+      arch.nodes.push({ id: 'worker', label: 'Async Worker', type: 'app', x: 600, y: 300, w: 120, h: 50 });
+      arch.conns.push({ from: 'app', to: 'queue', label: 'enqueue' });
+      arch.conns.push({ from: 'queue', to: 'worker', label: 'consume' });
+      arch.conns.push({ from: 'worker', to: 'db', label: 'persist' });
+    }
+  },
+  {
+    threshold: 60,
+    node: 'db',
+    msg: "Traffic continues to grow. Background workers and app servers are writing constantly. Write locks are now blocking the remaining DB reads.",
+    upgrades: [
+      { id: 'nosql', label: 'Migrate to NoSQL', correct: false, explain: "A full database migration is high risk. There are easier steps to scale relational DBs first." },
+      { id: 'replica', label: 'Add DB Read Replica', correct: true, explain: "Separating read queries to a replica frees the primary database to handle only writes." }
+    ],
+    apply: () => {
+      arch.nodes.find(n => n.id === 'db').label = 'DB Primary';
+      arch.nodes.push({ id: 'replica', label: 'DB Replica', type: 'db', x: 400, y: 450, w: 110, h: 50 });
+      arch.conns.push({ from: 'db', to: 'replica', label: 'replicate' });
+      
+      // Move app reads from primary to replica conceptually
+      const c = arch.conns.find(c => c.from === 'app' && c.to === 'db');
+      if(c) c.label = 'writes';
+      arch.conns.push({ from: 'app', to: 'replica', label: 'reads (cache miss)' });
+    }
+  },
+  {
+    threshold: 80,
+    node: 'users',
+    msg: "The backend is stable, but users in Asia are experiencing 800ms latency to load the frontend application assets.",
+    upgrades: [
+      { id: 'cdn', label: 'Add CDN', correct: true, explain: "A CDN caches static assets (images, JS, CSS) at edge locations worldwide, drastically reducing global latency." },
+      { id: 'multi-region', label: 'Multi-region deployment', correct: false, explain: "Deploying the whole stack to multiple regions is massively complex. Always use a CDN first." }
+    ],
+    apply: () => {
+      arch.nodes.push({ id: 'cdn', label: 'CDN Edge', type: 'cache', x: 200, y: 50, w: 110, h: 50 });
+      arch.conns.push({ from: 'users', to: 'cdn', label: 'static' });
+    }
+  },
+  {
+    threshold: 100,
+    node: null,
+    msg: "You successfully evolved the architecture to handle 10k RPS!",
+    upgrades: [],
+    apply: () => {}
+  }
+];
+
+let currentStageIdx = 0;
+let maxAllowedTraffic = stages[0].threshold;
+
+// Initial architecture
+const arch = {
+  nodes: [
+    { id: 'users', label: 'Users', type: 'users', x: 400, y: 50, w: 110, h: 50 },
+    { id: 'lb', label: 'Load Balancer', type: 'lb', x: 400, y: 150, w: 110, h: 50 },
+    { id: 'app', label: 'App Server', type: 'app', x: 400, y: 250, w: 110, h: 50 },
+    { id: 'db', label: 'Database', type: 'db', x: 400, y: 350, w: 110, h: 50 }
+  ],
+  conns: [
+    { from: 'users', to: 'lb', label: 'HTTPS' },
+    { from: 'lb', to: 'app', label: '' },
+    { from: 'app', to: 'db', label: 'read/write' }
+  ]
+};
+
+function layout() {
+  // Center is X=400.
+  // Left is X=200, Right is X=600.
+  // Y layers: 50, 150, 250, 350, 450
+  
+  // No complex logic needed as long as we define coordinates carefully in apply()
+}
+
+function render() {
+  layout();
+  const nodesG = document.getElementById('nodesG');
+  const connsG = document.getElementById('connsG');
+  
+  nodesG.innerHTML = '';
+  connsG.innerHTML = '';
+  
+  // Render Connections
+  arch.conns.forEach(c => {
+    const f = arch.nodes.find(n => n.id === c.from);
+    const t = arch.nodes.find(n => n.id === c.to);
+    if(!f || !t) return;
+    
+    let fx = f.x + f.w/2, fy = f.y + f.h/2;
+    let tx = t.x + t.w/2, ty = t.y + t.h/2;
+    
+    const dx = tx - fx, dy = ty - fy;
+    
+    // Snap to edges of rects
+    if (Math.abs(dx) > Math.abs(dy)) {
+      fx = dx > 0 ? f.x + f.w : f.x;
+      tx = dx > 0 ? t.x : t.x + t.w;
+    } else {
+      fy = dy > 0 ? f.y + f.h : f.y;
+      ty = dy > 0 ? t.y : t.y + t.h;
+    }
+    
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', fx);
+    line.setAttribute('y1', fy);
+    line.setAttribute('x2', tx);
+    line.setAttribute('y2', ty);
+    line.setAttribute('class', 'conn-line');
+    connsG.appendChild(line);
+    
+    if (c.label) {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', (fx+tx)/2);
+      text.setAttribute('y', (fy+ty)/2 - 8);
+      text.setAttribute('class', 'conn-label');
+      text.textContent = c.label;
+      connsG.appendChild(text);
+    }
+  });
+  
+  // Render Nodes
+  arch.nodes.forEach(n => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', n.x);
+    rect.setAttribute('y', n.y);
+    rect.setAttribute('width', n.w);
+    rect.setAttribute('height', n.h);
+    rect.setAttribute('class', 'node-rect node-' + n.type);
+    rect.id = 'node-' + n.id;
+    g.appendChild(rect);
+    
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', n.x + n.w/2);
+    text.setAttribute('y', n.y + n.h/2);
+    text.setAttribute('class', 'node-text');
+    text.textContent = n.label;
+    g.appendChild(text);
+    
+    nodesG.appendChild(g);
+  });
+}
+
+const slider = document.getElementById('trafficSlider');
+const label = document.getElementById('trafficLabel');
+const bPanel = document.getElementById('bottleneckPanel');
+const inst = document.getElementById('instructions');
+const fb = document.getElementById('feedback');
+
+slider.addEventListener('input', (e) => {
+  let val = parseInt(e.target.value);
+  
+  // Prevent sliding past current bottleneck
+  if (val > maxAllowedTraffic) {
+    slider.value = maxAllowedTraffic;
+    val = maxAllowedTraffic;
+  }
+  
+  // Scale label arbitrarily for effect (e.g. 0 to 10k RPS)
+  label.textContent = (val * 100).toLocaleString() + ' RPS';
+  
+  if (val >= maxAllowedTraffic && currentStageIdx < stages.length) {
+    triggerBottleneck();
+  }
+});
+
+function triggerBottleneck() {
+  const stage = stages[currentStageIdx];
+  
+  if(stage.threshold === 100) {
+    inst.style.display = 'block';
+    inst.innerHTML = `<h3 style="color:var(--green);margin-bottom:0.5rem;">🎉 Architecture Scaled!</h3><p style="color:var(--muted);font-size:0.9rem;">You successfully evolved the architecture to handle 10,000 RPS.</p>`;
+    bPanel.style.display = 'none';
+    
+    // Auto-save completion
+    localStorage.setItem('evolution_slider_complete', 'true');
+    return;
+  }
+  
+  inst.style.display = 'none';
+  bPanel.style.display = 'block';
+  
+  document.getElementById('bottleneckMsg').textContent = stage.msg;
+  document.querySelectorAll('.node-rect').forEach(el => el.classList.remove('bottleneck'));
+  
+  const targetNode = document.getElementById('node-' + stage.node);
+  if(targetNode) targetNode.classList.add('bottleneck');
+  
+  const list = document.getElementById('upgradesList');
+  list.innerHTML = stage.upgrades.map(u => `
+    <button class="upgrade-btn" onclick="applyUpgrade('${u.id}')">${u.label}</button>
+  `).join('');
+  
+  fb.textContent = '';
+}
+
+function applyUpgrade(id) {
+  const stage = stages[currentStageIdx];
+  const upgrade = stage.upgrades.find(u => u.id === id);
+  const btns = document.querySelectorAll('.upgrade-btn');
+  
+  if (upgrade.correct) {
+    fb.innerHTML = `<strong>✅ Correct.</strong><br>${upgrade.explain}`;
+    fb.style.color = 'var(--text)';
+    
+    btns.forEach(b => {
+      b.disabled = true;
+      if (b.textContent === upgrade.label) b.classList.add('upgrade-correct');
+    });
+    
+    setTimeout(() => {
+      // Remove bottleneck visual
+      document.querySelectorAll('.node-rect').forEach(el => el.classList.remove('bottleneck'));
+      
+      // Apply structural change
+      stage.apply();
+      render();
+      
+      // Advance to next stage
+      currentStageIdx++;
+      if (currentStageIdx < stages.length) {
+        maxAllowedTraffic = stages[currentStageIdx].threshold;
+      }
+      
+      // Reset UI
+      bPanel.style.display = 'none';
+      inst.style.display = 'block';
+      inst.querySelector('h3').textContent = 'Status: Healthy';
+      inst.querySelector('h3').style.color = 'var(--green)';
+      inst.querySelector('p').textContent = 'The upgrade relieved the pressure. Increase traffic.';
+      
+    }, 2500);
+    
+  } else {
+    fb.innerHTML = `<span style="color:var(--red)"><strong>❌ Not quite.</strong></span><br>${upgrade.explain}`;
+    event.target.classList.add('upgrade-wrong');
+  }
+}
+
+// Persist the state across reloads? For this specific tool, it's so short that resetting is actually good for practice.
+// But we'll save simple state if completed.
+if (localStorage.getItem('evolution_slider_complete')) {
+  // optionally load final state, but let's keep it simple for now.
+}
+
+render();
+</script>
+</body>
+</html>
