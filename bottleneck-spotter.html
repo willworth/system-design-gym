@@ -657,11 +657,12 @@ const architectures = [
         icon: '☠️',
         title: 'Poison messages in queue',
         desc: 'Malformed events that crash workers on processing.',
-        bottleneck: 'worker1',
-        why: 'A poison message gets delivered to a worker, crashes it, returns to the queue, gets delivered to another worker, crashes that one too. Without proper dead-lettering with a max retry count, the same message cycles through all workers, effectively DDoS-ing your own system.',
+        bottleneck: 'queue',
+        acceptableBottlenecks: ['queue', 'worker1', 'worker2', 'worker3'],
+        why: 'The queue plus consumer group is the failing pattern: a malformed message is delivered, crashes a worker, becomes visible again, and is retried by another worker. The interesting interview answer is not "Worker 1"; it is the missing max-retry/dead-letter behavior that lets one bad message consume the worker pool.',
         cascades: [
-          'Worker crashes → restarts → picks same message → crashes again',
-          'All workers cycle through the poison message → throughput drops to zero',
+          'Worker crashes → message returns to the queue → another consumer receives it',
+          'The consumer group cycles through the poison message → useful throughput collapses',
           'Queue backlog grows because nothing is being processed',
           'DLQ is the escape valve — if configured with max retries',
           'Without DLQ or max retries: infinite crash loop'
@@ -729,7 +730,7 @@ const architectures = [
           'All services appear slow to clients (even though they\'re fine)',
           'Gateway may start returning 503s as connection limits hit',
           'Clients retry → amplifies the problem',
-          'Fix: auth caching (JWT validation without DB), circuit breaker, or async auth'
+          'Fix: local JWT validation, bounded auth-result caching, circuit breaker, and explicit fail-open/fail-closed policy by route'
         ],
         stressNodes: ['auth', 'auth-db', 'gateway'],
         stressConns: [['gateway', 'auth'], ['auth', 'auth-db']]
@@ -772,9 +773,9 @@ const architectures = [
         id: 'gateway-spof',
         icon: '🚪',
         title: 'API Gateway crashes',
-        desc: 'The single gateway instance has an OOM error.',
+        desc: 'The intentionally vulnerable snapshot has one gateway instance, and it has an OOM error.',
         bottleneck: 'gateway',
-        why: 'The API gateway is a single point of failure. Every client request passes through it. If it crashes, nothing works — even though every backend service is perfectly healthy. This is why gateways need redundancy, health checks, and auto-restart as a minimum.',
+        why: 'This diagram intentionally shows the vulnerable architecture snapshot: the API gateway is a single point of failure. Every client request passes through it. If it crashes, nothing works — even though every backend service is perfectly healthy. This is why gateways need redundancy, health checks, and auto-restart as a minimum.',
         cascades: [
           'All client requests fail immediately (connection refused)',
           'No traffic reaches any service — total outage',
@@ -784,6 +785,126 @@ const architectures = [
         ],
         stressNodes: ['gateway'],
         stressConns: [['clients', 'gateway']]
+      }
+    ]
+  },
+  {
+    id: 'cdn-origin',
+    title: 'CDN + Origin',
+    subtitle: 'Users → edge cache → origin app → database/object storage',
+    nodes: [
+      { id: 'users', type: 'users', label: 'Global\nUsers', x: 80, y: 180, w: 110, h: 50 },
+      { id: 'edge', type: 'cache', label: 'CDN Edge\nCache', x: 250, y: 180, w: 120, h: 55 },
+      { id: 'origin-lb', type: 'service', label: 'Origin\nLB', x: 430, y: 180, w: 110, h: 50 },
+      { id: 'origin-app', type: 'service', label: 'Origin\nApp', x: 590, y: 120, w: 110, h: 50 },
+      { id: 'origin-render', type: 'service', label: 'Page\nRenderer', x: 590, y: 250, w: 110, h: 50 },
+      { id: 'db', type: 'database', label: 'Primary\nDB', x: 760, y: 120, w: 110, h: 55 },
+      { id: 'object-store', type: 'database', label: 'Object\nStorage', x: 760, y: 250, w: 120, h: 55 },
+    ],
+    connections: [
+      { from: 'users', to: 'edge', label: 'GET' },
+      { from: 'edge', to: 'origin-lb', label: 'miss' },
+      { from: 'origin-lb', to: 'origin-app' },
+      { from: 'origin-lb', to: 'origin-render' },
+      { from: 'origin-app', to: 'db' },
+      { from: 'origin-render', to: 'db' },
+      { from: 'origin-render', to: 'object-store' },
+    ],
+    stresses: [
+      {
+        id: 'ttl-stampede',
+        icon: '🌩️',
+        title: 'Popular cache key expires',
+        desc: 'A homepage or product page TTL expires while thousands of users request it.',
+        bottleneck: 'origin-render',
+        acceptableBottlenecks: ['origin-render', 'db'],
+        why: 'The edge cache is doing its job until the hot object expires. Then many equivalent misses punch through to origin at once. The renderer and its DB queries become the real bottleneck unless request coalescing, stale-while-revalidate, or soft TTLs collapse the herd.',
+        cascades: [
+          'Edge miss storm sends duplicate origin requests',
+          'Renderer repeats expensive work for the same page',
+          'DB read load spikes from identical queries',
+          'Origin latency rises → edge connections stay open longer',
+          'Fix: request coalescing, stale-while-revalidate, prewarming, and jittered TTLs'
+        ],
+        stressNodes: ['edge', 'origin-render', 'db'],
+        stressConns: [['edge', 'origin-lb'], ['origin-render', 'db']]
+      },
+      {
+        id: 'origin-object-slow',
+        icon: '📦',
+        title: 'Object storage gets slow',
+        desc: 'Media/object reads from origin storage take 10× longer.',
+        bottleneck: 'object-store',
+        why: 'Cache hits stay fine, but every miss that needs the backing object store slows down. Origin workers wait on object reads, so render capacity drops even though the CDN edge still looks healthy for cached assets.',
+        cascades: [
+          'Misses hold origin worker threads longer',
+          'Renderer queue grows behind slow storage reads',
+          'Edge cache cannot fill new objects quickly',
+          'Users in cold regions see the failures first',
+          'Fix: origin shielding, object replication, timeouts, and separate media/render pools'
+        ],
+        stressNodes: ['object-store', 'origin-render', 'edge'],
+        stressConns: [['origin-render', 'object-store'], ['edge', 'origin-lb']]
+      }
+    ]
+  },
+  {
+    id: 'multi-tenant',
+    title: 'Multi-tenant SaaS',
+    subtitle: 'Shared app tier → tenant-aware workers → shared data plane',
+    nodes: [
+      { id: 'tenants', type: 'users', label: 'Many\nTenants', x: 80, y: 200, w: 110, h: 50 },
+      { id: 'lb', type: 'service', label: 'Load\nBalancer', x: 250, y: 200, w: 110, h: 50 },
+      { id: 'app', type: 'service', label: 'Shared\nApp', x: 420, y: 120, w: 110, h: 50 },
+      { id: 'workers', type: 'service', label: 'Shared\nWorkers', x: 420, y: 280, w: 120, h: 50 },
+      { id: 'queue', type: 'queue', label: 'Job\nQueue', x: 590, y: 280, w: 110, h: 50 },
+      { id: 'tenant-db', type: 'database', label: 'Tenant\nDB', x: 760, y: 120, w: 110, h: 55 },
+      { id: 'analytics', type: 'database', label: 'Analytics\nStore', x: 760, y: 280, w: 120, h: 55 },
+    ],
+    connections: [
+      { from: 'tenants', to: 'lb', label: 'requests' },
+      { from: 'lb', to: 'app' },
+      { from: 'app', to: 'tenant-db', label: 'tenant data' },
+      { from: 'app', to: 'queue', label: 'jobs' },
+      { from: 'queue', to: 'workers' },
+      { from: 'workers', to: 'tenant-db' },
+      { from: 'workers', to: 'analytics' },
+    ],
+    stresses: [
+      {
+        id: 'noisy-neighbor',
+        icon: '🏢',
+        title: 'One tenant imports 10M rows',
+        desc: 'A large customer starts a bulk import during business hours.',
+        bottleneck: 'workers',
+        acceptableBottlenecks: ['workers', 'tenant-db', 'queue'],
+        why: 'The noisy tenant consumes shared worker and database capacity. Without per-tenant quotas, queue isolation, or fair scheduling, one customer can degrade everyone else even though the application itself has not failed.',
+        cascades: [
+          'Bulk import fills the shared job queue',
+          'Workers spend most capacity on one tenant',
+          'Tenant DB write locks and IO increase',
+          'Other tenants see slow reads and delayed jobs',
+          'Fix: per-tenant rate limits, queue partitions, fair scheduling, and tenant-level back-pressure'
+        ],
+        stressNodes: ['workers', 'queue', 'tenant-db'],
+        stressConns: [['queue', 'workers'], ['workers', 'tenant-db']]
+      },
+      {
+        id: 'tenant-analytics-scan',
+        icon: '📊',
+        title: 'Heavy report scans all tenant data',
+        desc: 'An admin report runs a broad analytics query over the shared store.',
+        bottleneck: 'analytics',
+        why: 'The analytics store absorbs a cross-tenant scan. If it shares resources with user-facing projections, a reporting workload can starve normal dashboard reads and delay background jobs.',
+        cascades: [
+          'Long scan consumes analytics IO and memory',
+          'Dashboard queries queue behind reporting work',
+          'Workers writing analytics events slow down',
+          'Queue lag grows even though app requests still enter',
+          'Fix: workload isolation, precomputed aggregates, query limits, and report scheduling'
+        ],
+        stressNodes: ['analytics', 'workers', 'queue'],
+        stressConns: [['workers', 'analytics'], ['queue', 'workers']]
       }
     ]
   }
@@ -1146,7 +1267,8 @@ function renderAnswerPanel() {
 function submitAnswer() {
   if (!currentStress || !selectedNodeId) return;
 
-  const correct = selectedNodeId === currentStress.bottleneck;
+  const accepted = currentStress.acceptableBottlenecks || [currentStress.bottleneck];
+  const correct = accepted.includes(selectedNodeId);
   score.total++;
   if (correct) score.correct++;
   answeredStresses.add(currentStress.id);
@@ -1180,12 +1302,17 @@ let results = [];
 function addResult(correct) {
   const bottleneckNode = currentArch.nodes.find(n => n.id === currentStress.bottleneck);
   const selectedNode = currentArch.nodes.find(n => n.id === selectedNodeId);
+  const acceptedLabels = (currentStress.acceptableBottlenecks || [currentStress.bottleneck])
+    .map(id => currentArch.nodes.find(n => n.id === id))
+    .filter(Boolean)
+    .map(n => n.label.replace('\n', ' '));
 
   results.push({
     stress: currentStress,
     correct,
     selected: selectedNode,
-    bottleneck: bottleneckNode
+    bottleneck: bottleneckNode,
+    acceptedLabels
   });
 }
 
@@ -1203,7 +1330,7 @@ function renderResultsPanel() {
         ${r.correct ? '✅' : '❌'}
         ${r.stress.icon} ${r.stress.title}
       </h4>
-      ${!r.correct ? `<p>You picked: <strong>${r.selected.label.replace('\n', ' ')}</strong> → Actual: <strong style="color:var(--amber)">${r.bottleneck.label.replace('\n', ' ')}</strong></p>` : ''}
+      ${!r.correct ? `<p>You picked: <strong>${r.selected.label.replace('\n', ' ')}</strong> → Strongest answer: <strong style="color:var(--amber)">${r.bottleneck.label.replace('\n', ' ')}</strong>${r.acceptedLabels.length > 1 ? ` <span style="color:var(--muted);">Also defensible with the right assumption: ${r.acceptedLabels.join(', ')}</span>` : ''}</p>` : ''}
       <p class="why">${r.stress.why}</p>
       <div style="margin-top:0.75rem;">
         <div style="font-size:0.75rem;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem;font-weight:600;">Cascade Effects</div>

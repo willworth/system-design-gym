@@ -5,7 +5,7 @@ Interactive tools for system design interview preparation. Focus: tradeoffs, not
 ## Tools
 
 ### `tradeoff-cards.html`
-Split-card layout for 7 core tradeoff pairs. Three modes:
+Split-card layout for 11 core tradeoff pairs. Three modes:
 - **Study** — full details visible
 - **Quiz** — content blurred, click to reveal
 - **Scenarios** — real-world prompts, pick the right side
@@ -20,6 +20,7 @@ Architecture design simulator. Pick a challenge, work through the 5-step answer 
 
 Features:
 - 35-minute countdown with phase markers
+- Mock Interview mode: random challenge, 20-minute stage timer, diagram locked during the 2-minute clarify-only phase, random constraint interrupt, tradeoff-defense and summary stages
 - Guided hints (blurred, reveal on click)
 - Notes panel for writing your answer
 - Diagram canvas for sketching architecture
@@ -33,6 +34,8 @@ Architectures included:
 - Standard Web Application (LB → app → DB + cache)
 - Event Processing Pipeline (producers → queue → workers → storage)
 - Microservices with API Gateway (gateway → services → DBs + external APIs)
+- CDN + Origin (edge cache → origin render/data stores)
+- Multi-tenant SaaS (shared app/workers → tenant-aware data plane)
 
 ### Challenges included (whiteboard):
 - Notification System

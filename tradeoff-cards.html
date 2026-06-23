@@ -521,19 +521,19 @@ const tradeoffs = [
         'Cache-like access patterns (key → value lookups)'
       ],
       consequences: [
-        'No joins — denormalization often required',
+        'Joins are weaker, more expensive, or unavailable depending on the store — denormalization is often required',
         'Application must handle data integrity',
         'Flexible schema = easy to write garbage',
         'Horizontal scaling is more natural'
       ]
     },
-    tension: 'Relational gives you constraints that prevent mistakes. NoSQL gives you freedom that enables speed. The cost of relational is rigidity; the cost of NoSQL is discipline. Choose based on access patterns and how much you trust your application layer.'
+    tension: 'Relational gives you constraints that prevent mistakes. NoSQL gives you freedom that enables speed. Senior designs often combine them: SQL for the transactional core, plus NoSQL/search/cache stores for adjacent access patterns. Choose based on access patterns, guarantees, and how much you trust your application layer.'
   },
   {
     id: 'replication-sharding',
     left: {
       name: 'Replication',
-      what: 'Same data copied to multiple nodes. Improves read availability and fault tolerance. Does NOT increase write capacity.',
+      what: 'Same data copied to multiple nodes. Improves read availability and fault tolerance. Primary-replica replication does NOT increase write capacity.',
       useCases: [
         'Read-heavy workloads (content sites, dashboards)',
         'Geographic distribution (replica near users)',
@@ -563,7 +563,7 @@ const tradeoffs = [
         'Application complexity increases significantly'
       ]
     },
-    tension: 'Replication makes reads better and adds resilience. Sharding makes writes scale and handles data volume. They solve different problems and are often combined. Reach for replication first — it\'s simpler. Shard when you must, not when you might.'
+    tension: 'Replication makes reads better and adds resilience. Sharding makes writes scale and handles data volume. They solve different problems and are often combined. The "no write capacity increase" warning mostly applies to primary-replica setups; multi-primary can distribute writes but adds conflict and consistency costs. Reach for replication first — it\'s simpler. Shard when you must, not when you might.'
   },
   {
     id: 'caching-freshness',
@@ -631,11 +631,156 @@ const tradeoffs = [
       consequences: [
         'User gets fast acknowledgment, not final result',
         'Harder to debug — no linear request trace',
-        'Requires queues, workers, retry logic',
+        'Requires queues, workers, retry logic, idempotency, and duplicate handling',
+        'Needs stronger observability because failures happen away from the user request',
         'More resilient: failures don\'t cascade to the user'
       ]
     },
-    tension: 'Sync is simpler and gives immediate feedback. Async is more resilient and decoupled. The key question: does the user need to see the result right now, or just know their request was accepted? Move work async when the answer is "accepted is enough."'
+    tension: 'Sync is simpler and gives immediate feedback. Async is more resilient and decoupled, but makes duplicate handling, retries, ordering, and debugging part of the design. The key question: does the user need to see the result right now, or just know their request was accepted? Move work async when the answer is "accepted is enough."'
+  },
+  {
+    id: 'push-pull',
+    left: {
+      name: 'Push',
+      what: 'The server sends updates as they happen. Clients keep a live connection or subscription open.',
+      useCases: [
+        'Chat, multiplayer, collaborative editing',
+        'Dashboards where seconds matter',
+        'Notifications and presence',
+        'Systems where polling waste would be high'
+      ],
+      consequences: [
+        'Lower update latency',
+        'Connection state must be managed',
+        'Harder load balancing and reconnect behavior',
+        'Back-pressure matters when clients are slow'
+      ]
+    },
+    right: {
+      name: 'Pull',
+      what: 'Clients ask for updates on an interval or when a user action needs fresh data.',
+      useCases: [
+        'Low-frequency status pages',
+        'Admin tools and reports',
+        'Mobile clients preserving battery',
+        'Systems where stale-by-minutes is acceptable'
+      ],
+      consequences: [
+        'Simple HTTP request/response model',
+        'Can create wasted load when nothing changed',
+        'Update latency equals the polling interval',
+        'Easier caching, retries, and rate limiting'
+      ]
+    },
+    tension: 'Push buys freshness and efficiency for genuinely live experiences, but it turns clients into long-lived participants in the system. Pull is boring, cheap to reason about, and often enough. The senior answer starts with required freshness, number of clients, and tolerance for missed or delayed updates.'
+  },
+  {
+    id: 'strong-eventual',
+    left: {
+      name: 'Strong Consistency',
+      what: 'After a write succeeds, later reads observe it. The system pays coordination cost for a single agreed truth.',
+      useCases: [
+        'Payments, permissions, account balances',
+        'Inventory reservation and booking',
+        'Uniqueness constraints',
+        'Admin actions with legal or security impact'
+      ],
+      consequences: [
+        'Higher latency across regions',
+        'Lower availability during partitions',
+        'Simpler product semantics',
+        'Coordination bottlenecks can cap throughput'
+      ]
+    },
+    right: {
+      name: 'Eventual Consistency',
+      what: 'Writes propagate asynchronously. Reads may be stale for a bounded or unbounded window.',
+      useCases: [
+        'Feeds, counters, search indexes',
+        'Analytics and recommendations',
+        'Multi-region read replicas',
+        'Derived views rebuilt from events'
+      ],
+      consequences: [
+        'Lower latency and higher regional availability',
+        'Users may see temporary contradictions',
+        'Requires reconciliation and conflict handling',
+        'Product copy and UX must tolerate lag'
+      ]
+    },
+    tension: 'Strong consistency protects invariants; eventual consistency protects scale and availability. Most mature systems split the domain: strong writes for scarce or risky facts, eventual projections for discovery, search, feeds, and analytics.'
+  },
+  {
+    id: 'coupling-speed',
+    left: {
+      name: 'Low Coupling',
+      what: 'Components have explicit boundaries and minimal assumptions about each other.',
+      useCases: [
+        'Teams deploying independently',
+        'Systems with multiple product surfaces',
+        'Long-lived domains with changing internals',
+        'Third-party integrations'
+      ],
+      consequences: [
+        'More contracts, versioning, and glue code',
+        'Slower first implementation',
+        'Failures are easier to isolate',
+        'Boundaries can be tested independently'
+      ]
+    },
+    right: {
+      name: 'Speed of Development',
+      what: 'Code is colocated and direct. The team optimizes for learning and shipping the first correct shape.',
+      useCases: [
+        'Early products and prototypes',
+        'Small teams with shared context',
+        'Unproven domain boundaries',
+        'Features likely to be rewritten'
+      ],
+      consequences: [
+        'Fewer abstractions and less ceremony',
+        'Faster iteration while requirements are moving',
+        'Hidden coupling accumulates',
+        'Extraction later requires discipline'
+      ]
+    },
+    tension: 'Premature decoupling can slow learning; unchecked coupling can freeze a product later. A strong interview answer names which boundaries are stable enough to protect now and which ones should stay simple until the product teaches you more.'
+  },
+  {
+    id: 'complexity-capability',
+    left: {
+      name: 'Operational Simplicity',
+      what: 'Fewer moving parts, clearer failure modes, and a smaller on-call surface.',
+      useCases: [
+        'Small teams',
+        'Low-margin or internal products',
+        'Systems without 24/7 operations',
+        'MVPs where correctness beats sophistication'
+      ],
+      consequences: [
+        'Feature set may be narrower',
+        'Scaling levers are limited',
+        'Incidents are easier to diagnose',
+        'Lower cognitive load for new engineers'
+      ]
+    },
+    right: {
+      name: 'Product Capability',
+      what: 'The architecture accepts more machinery to unlock richer behavior or stronger guarantees.',
+      useCases: [
+        'Real-time collaboration',
+        'Personalization and ranking',
+        'Complex workflows and audit trails',
+        'Enterprise-grade controls'
+      ],
+      consequences: [
+        'More queues, stores, workers, and backfills',
+        'More observability and runbooks required',
+        'Higher staffing and incident cost',
+        'Can unlock product value a simple design cannot'
+      ]
+    },
+    tension: 'Capability is not free; every feature-shaped subsystem becomes an operations-shaped responsibility. The right answer ties the complexity budget to business value, team size, and failure cost.'
   }
 ];
 
@@ -645,7 +790,7 @@ const scenarios = [
     tradeoff: 'availability-consistency',
     answer: 'left',
     answerLabel: 'Availability',
-    explain: 'Product browsing should always work, even if a price is a few seconds stale. A page that fails to load loses the sale entirely. Stock can use soft checks here and hard checks at checkout.'
+    explain: 'Product browsing should usually optimize for availability, even if a price or stock badge is a few seconds stale. A page that fails to load loses the sale entirely. The senior pattern is mixed: soft checks and cached reads on browse, strong consistency for reservation, payment, and final inventory checks.'
   },
   {
     prompt: 'A user clicks "Place Order" and their payment needs to be processed. Which matters more?',
@@ -708,7 +853,7 @@ const scenarios = [
     tradeoff: 'relational-nosql',
     answer: 'right',
     answerLabel: 'NoSQL',
-    explain: 'Early-stage social apps have fast-changing schemas, nested/hierarchical data (profiles, messages), and key-value access patterns. NoSQL lets you iterate without migration pain. You can add structure later when patterns stabilize.'
+    explain: 'Early-stage social apps often have fast-changing profile shapes and key-value access patterns, so NoSQL can help iteration. But sessions and chat messages can still justify SQL if transactions, moderation queries, or reporting matter. The senior answer is access-pattern specific, not "social app = NoSQL."'
   },
   {
     prompt: 'You\'re building an order management system where orders have line items, shipping addresses, payment records, and need monthly financial reports.',
@@ -723,6 +868,34 @@ const scenarios = [
     answer: 'right',
     answerLabel: 'Throughput',
     explain: 'No one is waiting in real time — optimize for processing the maximum volume of data efficiently. Batch it, parallelize it, use bigger machines. Individual record latency doesn\'t matter.'
+  },
+  {
+    prompt: 'A courier-tracking map should update driver locations while the dispatcher watches the screen. Which delivery model fits best?',
+    tradeoff: 'push-pull',
+    answer: 'left',
+    answerLabel: 'Push',
+    explain: 'This is a live monitoring experience: stale locations reduce usefulness, and repeated polling from many dispatch screens creates waste. Use push for the active view, with reconnect and back-pressure handling.'
+  },
+  {
+    prompt: 'A nightly finance export must include every approved transaction exactly once. Which consistency model matters?',
+    tradeoff: 'strong-eventual',
+    answer: 'left',
+    answerLabel: 'Strong Consistency',
+    explain: 'The invariant matters more than speed. Approvals, ledger writes, and export boundaries need a strongly consistent source of truth, even if search or reporting projections are eventual.'
+  },
+  {
+    prompt: 'A two-person team is testing whether users want a new planning app. Should the first version optimize for low coupling or speed?',
+    tradeoff: 'coupling-speed',
+    answer: 'right',
+    answerLabel: 'Speed of Development',
+    explain: 'The domain boundaries are not proven yet. A small team should ship the simplest coherent version, while keeping obvious seams around data ownership and external integrations for later extraction.'
+  },
+  {
+    prompt: 'An enterprise customer asks for real-time audit trails, role history, and replayable workflow events. What pressure are you accepting?',
+    tradeoff: 'complexity-capability',
+    answer: 'right',
+    answerLabel: 'Product Capability',
+    explain: 'Those capabilities likely justify event storage, background projection, stronger observability, and operational runbooks. The right answer is to name the extra operating cost, not pretend the capability is free.'
   }
 ];
 
